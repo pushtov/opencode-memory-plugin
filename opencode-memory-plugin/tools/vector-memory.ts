@@ -2,6 +2,34 @@ import { tool } from "@opencode-ai/plugin"
 import path from "path"
 import { readFile, exists, mkdir } from "fs/promises"
 import Database from "better-sqlite3"
+import { pipeline, env } from "@huggingface/transformers"
+import {
+  loadConfig,
+  getSearchMode,
+  getEmbeddingModel,
+  isEmbeddingEnabled,
+  getConfig
+} from "./config"
+
+// Configure Transformers.js for local use (no external calls)
+env.allowLocalModels = true
+env.allowRemoteModels = true
+env.useBrowserCache = false
+import path from "path"
+import { readFile, exists, mkdir } from "fs/promises"
+import Database from "better-sqlite3"
+import { pipeline, env } from "@huggingface/transformers"
+
+// Configure Transformers.js for local use (no external calls)
+env.allowLocalModels = true
+env.allowRemoteModels = true
+env.useBrowserCache = false
+// Silence transformers.js warnings in production
+// env.disableLogging = false  // Keep logging for debugging
+
+import path from "path"
+import { readFile, exists, mkdir } from "fs/promises"
+import Database from "better-sqlite3"
 
 const MEMORY_DIR = path.join(process.env.HOME || "", ".opencode", "memory")
 const VECTOR_DB_PATH = path.join(MEMORY_DIR, "vector-index.db")
@@ -47,29 +75,124 @@ async function ensureVectorIndex() {
   db.close()
 }
 
-// Helper: Get text embedding using local model
-async function getEmbedding(text: string): Promise<number[]> {
-  // This would use node-llama-cpp for local embeddings
-  // For now, return a simple hash-based embedding as fallback
-  // TODO: Integrate with node-llama-cpp
-  
-  const words = text.toLowerCase().split(/\s+/)
-  const embedding: number[] = []
-  
-  // Create a simple 384-dimension embedding (typical for small models)
-  for (let i = 0; i < 384; i++) {
-    let hash = 0
-    for (let j = 0; j < words.length; j++) {
-      const word = words[j]
-      for (let k = 0; k < word.length; k++) {
-        hash = ((hash << 5) - hash) + word.charCodeAt(k)
-        hash |= 0
-      }
-    }
-    embedding.push((hash % 1000) / 1000) // Normalize to 0-1
+// Helper: Initialize embedding model (lazy load)
+let embeddingModel: any = null
+let currentModelName: string | null = null
+
+async function ensureEmbeddingModel() {
+  // Check if embeddings are enabled
+  if (!(await isEmbeddingEnabled())) {
+    throw new Error("Embeddings are disabled in configuration")
   }
   
-  return embedding
+  // Get configured model
+  const modelName = await getEmbeddingModel()
+  
+  // Return if model already loaded
+  if (embeddingModelReady && currentModelName === modelName) {
+    return
+  }
+  
+  // Reload if different model
+  if (currentModelName && currentModelName !== modelName) {
+    console.log(`Switching embedding model: ${currentModelName} → ${modelName}`)
+    embeddingModel = null
+    embeddingModelReady = false
+  }
+  
+  try {
+    console.log(`Loading embedding model: ${modelName}`)
+    
+    // Load the embedding model (configurable)
+    embeddingModel = await pipeline('feature-extraction', modelName, {
+      progress_callback: (progress: any) => {
+        // Only log significant progress to avoid spam
+        if (progress.status === 'downloading' && progress.progress !== undefined) {
+          if (Math.floor(progress.progress * 100) % 25 === 0) {
+            console.log(`  Downloading model: ${Math.floor(progress.progress * 100)}%`)
+          }
+        }
+      }
+    })
+    
+    currentModelName = modelName
+    embeddingModelReady = true
+    console.log(`✓ Model loaded: ${modelName}`)
+  } catch (error) {
+    console.error('Failed to load embedding model:', error)
+    throw error
+  }
+}
+
+// Helper: Get text embedding using local model
+async function getEmbedding(text: string): Promise<number[]> {
+  // Check if we should use embeddings
+  if (!(await isEmbeddingEnabled())) {
+    throw new Error("Embeddings are disabled")
+  }
+  
+  try {
+    await ensureEmbeddingModel()
+    
+    // Get model info to determine dimensions
+    const config = await getConfig()
+    const modelInfo = config.models.available[currentModelName!]
+    const dimensions = modelInfo?.dimensions || 384
+    
+    // Generate embedding using Transformers.js
+    const output = await embeddingModel(text, {
+      pooling: 'mean',
+      normalize: true
+    })
+    
+    // Convert Tensor to number array
+    const embedding = Array.from(output.data as Float32Array)
+    
+    return embedding
+  } catch (error) {
+    console.error('Embedding generation failed, using fallback:', error)
+    
+    // Get fallback mode from config
+    const config = await getConfig()
+    const fallbackMode = config.embedding.fallbackMode
+    
+    if (fallbackMode === 'error') {
+      throw new Error(`Embedding generation failed: ${error}`)
+    }
+    
+    if (fallbackMode === 'bm25') {
+      throw new Error('BM25_FALLBACK')  // Signal to use BM25-only search
+    }
+    
+    // Default: hash-based fallback
+    const config = await getConfig()
+    const modelInfo = config.models.available[currentModelName!]
+    const dimensions = modelInfo?.dimensions || 384
+    
+    const words = text.toLowerCase().split(/\s+/)
+    const fallbackEmbedding: number[] = []
+    
+    for (let i = 0; i < dimensions; i++) {
+      let hash = 0
+      for (const word of words) {
+        for (let k = 0; k < word.length; k++) {
+          hash = ((hash << 5) - hash) + word.charCodeAt(k)
+          hash |= 0
+        }
+      }
+      fallbackEmbedding.push((hash % 1000) / 1000)
+    }
+    
+    return fallbackEmbedding
+  }
+}
+
+// Helper: Initialize embedding model asynchronously (call during startup)
+export async function initEmbeddingModel() {
+  // Pre-load the model in the background
+  ensureEmbeddingModel().catch(err => {
+    console.warn('Failed to pre-load embedding model:', err)
+  })
 }
 
 // Helper: Split text into chunks
