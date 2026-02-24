@@ -3,6 +3,22 @@ import path from "path"
 import { readFile, exists, mkdir } from "fs/promises"
 import Database from "better-sqlite3"
 import { pipeline, env } from "@huggingface/transformers"
+import {
+  loadConfig,
+  getSearchMode,
+  getEmbeddingModel,
+  isEmbeddingEnabled,
+  getConfig
+} from "./config"
+
+// Configure Transformers.js for local use (no external calls)
+env.allowLocalModels = true
+env.allowRemoteModels = true
+env.useBrowserCache = false
+import path from "path"
+import { readFile, exists, mkdir } from "fs/promises"
+import Database from "better-sqlite3"
+import { pipeline, env } from "@huggingface/transformers"
 
 // Configure Transformers.js for local use (no external calls)
 env.allowLocalModels = true
@@ -61,25 +77,47 @@ async function ensureVectorIndex() {
 
 // Helper: Initialize embedding model (lazy load)
 let embeddingModel: any = null
-let embeddingModelReady = false
+let currentModelName: string | null = null
 
 async function ensureEmbeddingModel() {
-  if (embeddingModelReady) return
+  // Check if embeddings are enabled
+  if (!(await isEmbeddingEnabled())) {
+    throw new Error("Embeddings are disabled in configuration")
+  }
+  
+  // Get configured model
+  const modelName = await getEmbeddingModel()
+  
+  // Return if model already loaded
+  if (embeddingModelReady && currentModelName === modelName) {
+    return
+  }
+  
+  // Reload if different model
+  if (currentModelName && currentModelName !== modelName) {
+    console.log(`Switching embedding model: ${currentModelName} → ${modelName}`)
+    embeddingModel = null
+    embeddingModelReady = false
+  }
   
   try {
-    // Load the embedding model - Xenova/all-MiniLM-L6-v2
-    // This model produces 384-dimensional embeddings
-    embeddingModel = await pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2', {
+    console.log(`Loading embedding model: ${modelName}`)
+    
+    // Load the embedding model (configurable)
+    embeddingModel = await pipeline('feature-extraction', modelName, {
       progress_callback: (progress: any) => {
         // Only log significant progress to avoid spam
         if (progress.status === 'downloading' && progress.progress !== undefined) {
           if (Math.floor(progress.progress * 100) % 25 === 0) {
-            // Log at 25%, 50%, 75%, 100%
+            console.log(`  Downloading model: ${Math.floor(progress.progress * 100)}%`)
           }
         }
       }
     })
+    
+    currentModelName = modelName
     embeddingModelReady = true
+    console.log(`✓ Model loaded: ${modelName}`)
   } catch (error) {
     console.error('Failed to load embedding model:', error)
     throw error
@@ -88,8 +126,18 @@ async function ensureEmbeddingModel() {
 
 // Helper: Get text embedding using local model
 async function getEmbedding(text: string): Promise<number[]> {
+  // Check if we should use embeddings
+  if (!(await isEmbeddingEnabled())) {
+    throw new Error("Embeddings are disabled")
+  }
+  
   try {
     await ensureEmbeddingModel()
+    
+    // Get model info to determine dimensions
+    const config = await getConfig()
+    const modelInfo = config.models.available[currentModelName!]
+    const dimensions = modelInfo?.dimensions || 384
     
     // Generate embedding using Transformers.js
     const output = await embeddingModel(text, {
@@ -98,18 +146,33 @@ async function getEmbedding(text: string): Promise<number[]> {
     })
     
     // Convert Tensor to number array
-    // The output is a 384-dimensional vector for all-MiniLM-L6-v2
     const embedding = Array.from(output.data as Float32Array)
     
     return embedding
   } catch (error) {
     console.error('Embedding generation failed, using fallback:', error)
     
-    // Fallback: Simple hash-based embedding (384 dimensions)
+    // Get fallback mode from config
+    const config = await getConfig()
+    const fallbackMode = config.embedding.fallbackMode
+    
+    if (fallbackMode === 'error') {
+      throw new Error(`Embedding generation failed: ${error}`)
+    }
+    
+    if (fallbackMode === 'bm25') {
+      throw new Error('BM25_FALLBACK')  // Signal to use BM25-only search
+    }
+    
+    // Default: hash-based fallback
+    const config = await getConfig()
+    const modelInfo = config.models.available[currentModelName!]
+    const dimensions = modelInfo?.dimensions || 384
+    
     const words = text.toLowerCase().split(/\s+/)
     const fallbackEmbedding: number[] = []
     
-    for (let i = 0; i < 384; i++) {
+    for (let i = 0; i < dimensions; i++) {
       let hash = 0
       for (const word of words) {
         for (let k = 0; k < word.length; k++) {

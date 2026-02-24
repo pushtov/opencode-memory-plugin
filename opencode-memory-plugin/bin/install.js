@@ -90,25 +90,83 @@ function createMemoryConfig() {
   }
 
   const config = {
-    version: '1.0.0',
-    auto_save: true,
-    auto_save_threshold_tokens: 1000,
-    vector_search: {
-      enabled: true,
-      hybrid: true,
-      rebuild_interval_hours: 24
+    version: '2.0',
+    search: {
+      mode: 'hybrid',
+      options: {
+        hybrid: {
+          vectorWeight: 0.7,
+          bm25Weight: 0.3
+        }
+      }
     },
+    embedding: {
+      enabled: true,
+      provider: 'transformers',
+      model: 'Xenova/all-MiniLM-L6-v2',
+      fallbackMode: 'hash',
+      cache: {
+        enabled: true,
+        directory: path.join(HOME, '.cache', 'huggingface')
+      }
+    },
+    models: {
+      available: {
+        'Xenova/all-MiniLM-L6-v2': {
+          dimensions: 384,
+          size: '80MB',
+          language: 'en',
+          useCase: 'general',
+          quality: 'good',
+          speed: 'fast'
+        },
+        'Xenova/bge-small-en-v1.5': {
+          dimensions: 384,
+          size: '130MB',
+          language: 'en',
+          useCase: 'high-quality',
+          quality: 'excellent',
+          speed: 'medium'
+        },
+        'Xenova/bge-base-en-v1.5': {
+          dimensions: 768,
+          size: '400MB',
+          language: 'en',
+          useCase: 'best-quality',
+          quality: 'best',
+          speed: 'slow'
+        },
+        'Xenova/e5-small-v2': {
+          dimensions: 384,
+          size: '130MB',
+          language: 'en',
+          useCase: 'question-answer',
+          quality: 'good',
+          speed: 'medium'
+        },
+        'Xenova/nomic-embed-text-v1.5': {
+          dimensions: 768,
+          size: '270MB',
+          language: 'en',
+          useCase: 'long-documents',
+          quality: 'excellent',
+          speed: 'medium'
+        }
+      }
+    },
+    indexing: {
+      chunkSize: 400,
+      chunkOverlap: 80,
+      autoRebuild: true
+    },
+    // Legacy v1.0 fields (for backward compatibility)
+    auto_save: true,
     consolidation: {
       enabled: true,
       run_daily: true,
       run_hour: 23,
       archive_days: 30,
       delete_days: 90
-    },
-    git_backup: {
-      enabled: false,
-      auto_commit: false,
-      auto_push: false
     },
     retention: {
       max_daily_files: 30,
@@ -119,7 +177,7 @@ function createMemoryConfig() {
   };
 
   fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
-  log('  ✓ Configuration created', 'green');
+  log('  ✓ Configuration created (v2.0)', 'green');
 }
 
 /**
