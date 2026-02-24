@@ -1,21 +1,26 @@
 # OpenCode Memory Plugin
 
-> OpenClaw-style persistent memory system for OpenCode with full automation and local vector search
+> OpenClaw-style persistent memory system for OpenCode with true semantic vector search powered by Transformers.js
 
 [![MIT License](https://img.shields.io/badge/License-MIT-blue.svg)](https://github.com/opencode-memory-plugin/blob/main/LICENSE)
-[![Version](https://img.shields.io/badge/version-1.0.0-green.svg)](https://github.com/opencode-memory-plugin/blob/main)
+[![npm version](https://img.shields.io/npm/v/@csuwl/opencode-memory-plugin.svg)](https://www.npmjs.com/package/@csuwl/opencode-memory-plugin)
+[![Downloads](https://img.shields.io/npm/dt/@csuwl/opencode-memory-plugin.svg)](https://www.npmjs.com/package/@csuwl/opencode-memory-plugin)
+
 [![OpenCode](https://img.shields.io/badge/OpenCode-compatible-success.svg)](https://docs.opencode.ai)
-[![npm](https://img.shields.io/badge/npm-%40csuwl%2Fopencode--memory--plugin-blue.svg)](https://www.npmjs.com/package/@csuwl/opencode-memory-plugin)
-[![Downloads](https://img.shields.io/npm/dt/@csuwl/opencode-memory-plugin)](https://www.npmjs.com/package/@csuwl/opencode-memory-plugin)
+[![Transformers.js](https://img.shields.io/badge/Transformers.js-3.8.1-orange.svg)](https://huggingface.co/docs/transformers.js)
+[![License](https://img.shields.io/badge/License-MIT-green.svg)](https://github.com/opencode-memory-plugin/blob/main/LICENSE)
 
 ## 🎯 Features
 
 - ✅ **OpenClaw-Style Memory System** - Complete 9 core memory files (SOUL, AGENTS, USER, IDENTITY, TOOLS, MEMORY, HEARTBEAT, BOOT, BOOTSTRAP)
+- ✅ **True Semantic Search** - Real vector embeddings using @huggingface/transformers (all-MiniLM-L6-v2 model)
 - ✅ **Fully Automated** - Automatically saves important information without being asked
-- ✅ **Local Vector Search** - Semantic search using local embeddings (sqlite-vec)
+- ✅ **Local Vector Search** - Semantic search using local embeddings (no API calls needed)
 - ✅ **Daily Memory Logs** - Running context with automatic consolidation
 - ✅ **Long-Term Memory** - Persistent knowledge across sessions and projects
 - ✅ **Hybrid Search** - BM25 + vector search for optimal results
+- ✅ **Model Auto-Download** - Embedding model downloads automatically on first use (~80MB)
+- ✅ **Flexible Configuration** - 5 embedding models, 4 search modes
 - **2 Automation Agents**:
   - `@memory-automation` - Auto-saves important information
   - `@memory-consolidate` - Auto-organizes daily logs
@@ -29,82 +34,132 @@
   - `rebuild_index` - Rebuild vector index
   - `index_status` - Check vector index status
 
-## 📦 Quick Start
+## 📦 Installation
 
-### Prerequisites
+### Method 1: NPM Installation (Recommended - Easiest!)
 
-- OpenCode v1.1.48 or later
-- Node.js 20+ (for development)
-
-### Installation
-
-#### Method 1: NPM Installation (Recommended - Easiest!)
-
+#### Global Installation
 ```bash
-# Install latest version from npm registry
-npm install @csuwl/opencode-memory-plugin -g
+# Install the latest version
+npm install -g @csuwl/opencode-memory-plugin
 
 # Or install a specific version
-npm install -g @csuwl/opencode-memory-plugin@1.0.0
+npm install -g @csuwl/opencode-memory-plugin@1.1.0
 
 # That's it! The plugin will be automatically configured for you! 🧠
 ```
 
-The npm installation automatically:
+#### Local Installation
+```bash
+# Install locally in your project
+npm install @csuwl/opencode-memory-plugin
+
+# Or install a specific version
+npm install @csuwl/opencode-memory-plugin@1.1.0
+```
+
+**What happens during installation**:
 - ✅ Creates memory directory structure (`~/.opencode/memory/`)
 - ✅ Copies all 9 memory files
 - ✅ Configures OpenCode to load memory into every session
 - ✅ Sets up automation agents
 - ✅ Initializes today's daily log
+- ✅ Creates configuration file (v2.0)
+- ✅ On first search, automatically downloads embedding model (~80MB)
 
-**No manual configuration needed!**
-
-#### Method 2: Manual Installation from Git
+### Method 2: Manual Installation from Git
 
 ```bash
 # Clone repository
 git clone https://github.com/csuwl/opencode-memory-plugin.git
 cd opencode-memory-plugin
 
-# Run initialization script
+# Run installation script
 bash opencode-memory-plugin/scripts/init.sh
 
 # That's it! Your OpenCode now has memory 🧠
 ```
 
-The initialization script will:
-1. Create memory directory structure
-2. Copy all memory files to `~/.opencode/memory/`
-3. Configure OpenCode to load memory into every session
-4. Set up automation agents
-5. Initialize today's daily log
+## 🔍 Search Modes
 
-### Usage
+The plugin supports 4 configurable search modes:
 
-The plugin automatically configures OpenCode to load memory files into every session:
+| Mode | Description | Speed | Quality | Model Required |
+|------|-------------|-------|---------|----------------|
+| `hybrid` | Vector + BM25 (default) | Medium | ⭐⭐⭐⭐ | ✅ Yes |
+| `vector` | Vector-only | Medium | ⭐⭐⭐ | ✅ Yes |
+| `bm25` | BM25-only (keywords) | Fast | ⭐⭐ | ❌ No |
+| `hash` | Hash-based (fallback) | Fast | ⭐ | ❌ No |
 
-**Memory files injected:**
-- `SOUL.md` - AI personality and boundaries
-- `AGENTS.md` - Operating instructions and memory rules
-- `USER.md` - User profile and preferences
-- `IDENTITY.md` - Assistant identity
-- `TOOLS.md` - Tool usage conventions
-- `MEMORY.md` - Long-term memory
-- Plus today's daily log
+**Default**: `hybrid` mode (70% vector + 30% BM25)
 
-### Available Tools
+## 🧠 Available Embedding Models
+
+The plugin supports 5 pre-configured embedding models:
+
+| Model | Size | Quality | Speed | Best For |
+|-------|------|---------|-------|----------|
+| **Xenova/all-MiniLM-L6-v2** | 80MB | ⭐⭐ | ⚡⚡⚡ | Baseline (default) |
+| **Xenova/bge-small-en-v1.5** ⭐ | 130MB | ⭐⭐⭐⭐ | ⚡⚡ | **Best balance** (recommended) |
+| **Xenova/bge-base-en-v1.5** | 400MB | ⭐⭐⭐⭐⭐ | ⚡⚡ | Maximum quality |
+| **Xenova/gte-small** | 70MB | ⭐⭐⭐⭐ | ⚡⚡⚡ | Small + fast |
+| **Xenova/nomic-embed-text-v1.5** | 270MB | ⭐⭐⭐⭐ | ⚡⚡ | Long documents |
+
+**Default**: `Xenova/all-MiniLM-L6-v2` (80MB, fast, good quality)
+
+## ⚙️ Configuration
+
+The plugin creates a configuration file at `~/.opencode/memory/memory-config.json`:
+
+### Quick Configuration Examples
+
+**Default (Balanced)** - Works out of the box:
+```json
+{
+  "search": { "mode": "hybrid" },
+  "embedding": {
+    "model": "Xenova/bge-small-en-v1.5"
+  }
+}
+```
+
+**Fast Search** (No model, keywords only):
+```json
+{
+  "search": { "mode": "bm25" },
+  "embedding": { "enabled": false }
+}
+```
+
+**High Quality** (Best model):
+```json
+{
+  "search": { "mode": "vector" },
+  "embedding": {
+    "model": "Xenova/bge-base-en-v1.5"
+  }
+}
+```
+
+For complete configuration guide, see [CONFIGURATION.md](https://github.com/opencode-memory-plugin/blob/main/opencode-memory-plugin/CONFIGURATION.md).
+
+## 📖 Usage
+
+After installation, all memory tools are available in OpenCode:
+
+### Basic Usage
 
 ```bash
-# In OpenCode, try these commands:
-
-# Write a memory entry
+# Write to memory
 memory_write content="User prefers TypeScript for all new features" type="long-term" tags=["typescript","code-style"]
 
-# Search for past information
+# Search memory
 memory_search query="async patterns"
 
-# Semantic search
+# Semantic search (NEW: uses real embeddings!)
 vector_memory_search query="how do I handle async errors"
+
+# The model understands meaning, not just keywords!
 
 # List recent daily logs
 list_daily days=7
@@ -129,7 +184,7 @@ rebuild_index force=true
 @memory-consolidate review and consolidate recent memories
 ```
 
-## 📖 Project Structure
+## 📂 Project Structure
 
 ```
 opencode-memory-plugin/
@@ -146,84 +201,45 @@ opencode-memory-plugin/
 │   └── daily/             # Daily logs
 ├── tools/               # Custom OpenCode tools
 │   ├── memory.ts            # Basic memory tools
-│   └── vector-memory.ts     # Vector search tools
+│   ├── config.ts            # Configuration management ⭐ NEW
+│   ├── search-modes.ts      # Search implementations ⭐ NEW
+│   └── vector-memory.ts     # Vector search tools (with Transformers.js)
 ├── agents/              # Custom OpenCode agents
 │   ├── memory-automation.md    # Auto-save agent
 │   └── memory-consolidate.md   # Auto-consolidate agent
 ├── scripts/             # Utility scripts
-│   └── init.sh              # Installation script
+│   └── uninstall.sh      # Uninstall script ⭐ NEW
 └── package.json           # NPM package configuration
 ```
 
-## 🔧 Development
+## 🔬 Under the Hood
 
-### Adding New Tools
+### Embedding Model
 
-1. Create a new tool in `tools/` directory
-2. Export the tool using `tool()` helper
-3. Update `agents/` to use the new tool
+**Model**: all-MiniLM-L6-v2 (converted to ONNX)
+- **Dimensions**: 384
+- **File size**: ~80MB
+- **Max sequence length**: 256 tokens
+- **Inference**: Local (ONNX Runtime)
 
-### Example Tool
+**Performance**:
+- First search: ~2-3 seconds (model loading + inference)
+- Subsequent searches: ~50-100ms per query
+- Memory usage: ~150-200MB RAM
 
-```typescript
-import { tool } from "@opencode-ai/plugin"
+### Hybrid Search Algorithm
 
-export default tool({
-
-  description: "Your tool description",
-
-  args: {
-    query: tool.schema.string().describe("Your parameter description"),
-  },
-
-  async execute(args, context) {
-    // Your tool logic here
-    return `Result: ${args.query}`
-  },
-
-})
+```
+final_score = 0.7 × vector_similarity + 0.3 × bm25_score
 ```
 
-### Adding New Agents
-
-1. Create agent markdown file in `agents/`
-2. Configure permissions and tools
-3. Add to `package.json` or create a PR
-
-## 📝 Configuration
-
-Memory system configuration is stored in:
-
-- `~/.opencode/memory/memory-config.json`
-- `~/.opencode/memory/MEMORY.md` - Long-term memory
-- `~/.opencode/memory/daily/YYYY-MM-DD.md` - Daily logs
-- `~/.opencode/memory/archive/` - Archived logs
-
-OpenCode configuration is in:
-
-- `~/.config/opencode/opencode.json` - Memory tools and agents
-
-## 🔧 Troubleshooting
-
-### Memory files not loading
-1. Check OpenCode config: `cat ~/.config/opencode/opencode.json`
-2. Verify file paths are correct
-3. Restart OpenCode if needed
-
-### Vector search not working
-1. Check vector index: `index_status`
-2. Rebuild if needed: `rebuild_index force=true`
-3. Check `memory-config.json` settings
-
-### Daily logs not creating
-1. Check directory: `ls ~/.opencode/memory/daily/`
-2. Manually initialize: `init_daily`
-3. Check permissions
+This combines semantic understanding (70%) with keyword matching (30%) for optimal results.
 
 ## 📚 Documentation
 
+- [Configuration Guide](https://github.com/opencode-memory-plugin/blob/main/opencode-memory-plugin/CONFIGURATION.md) - Complete configuration options
 - [OpenCode Docs](https://docs.opencode.ai) - Official OpenCode documentation
-- [OpenClaw Docs](https://docs.openclaw.ai) - Reference for OpenClaw-style memory system
+- [Transformers.js Docs](https://huggingface.co/docs/transformers.js) - Embedding model documentation
 
 ## 🤝 Contributing
 
@@ -251,10 +267,26 @@ MIT License - see [LICENSE](LICENSE) for details
 
 - OpenClaw team for the memory system design
 - OpenCode team for the plugin system
+- Hugging Face for Transformers.js and the all-MiniLM-L6-v2 model
 - All contributors and users
+
+## 📊 Version
+
+**Current Version**: v1.1.0
+
+**Changes in v1.1.0**:
+- ✨ True semantic search with Transformers.js
+- ✨ Flexible configuration system (v2.0)
+- ✨ 5 embedding models available
+- ✨ 4 search modes (hybrid, vector, bm25, hash)
+- ✨ TypeScript support
+- ✨ Uninstall script
+- ✨ Complete documentation
+
+For detailed changes, see [CHANGELOG.md](https://github.com/opencode-memory-plugin/blob/main/CHANGELOG.md).
 
 ---
 
 **Made with ❤️ for OpenCode community**
 
-*Your OpenCode instance now has perfect memory - just like OpenClaw!* 🧠
+*Your OpenCode instance now has perfect memory with true semantic understanding! 🧠✨*
