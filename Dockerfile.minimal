@@ -1,0 +1,72 @@
+# Minimal Dockerfile - no extra packages
+FROM node:20-alpine
+
+# Set environment variables
+ENV NODE_ENV=testing
+
+# Set working directory
+WORKDIR /usr/src/app
+# Install build tools and Python (needed for better-sqlite3 native compilation)
+RUN apk add --no-cache \
+    python3 \
+    make \
+    g++ \
+    sqlite
+
+# Install the plugin from npm registry
+RUN npm install -g @csuwl/opencode-memory-plugin@1.1.0
+
+# Verify installation
+RUN ls -la ~/.opencode/memory/ && cat ~/.opencode/memory/memory-config.json
+
+# Copy test scripts (just for reference)
+COPY test-docker.sh /usr/src/app/
+COPY test-opencode-integration.sh /usr/src/app/
+
+# Copy plugin source for reference
+COPY opencode-memory-plugin /usr/src/app/opencode-memory-plugin
+
+# Create test script (using sh instead of bash)
+RUN echo '#!/bin/sh\n\
+echo "========================================="\n\
+echo "  OpenCode Memory Plugin v1.1.0 - Docker"\n\
+echo "========================================="\n\
+echo ""\n\
+echo "Environment:"\n\
+echo "  Node.js: $(node --version)"\n\
+echo "  npm: $(npm --version)"\n\
+echo ""\n\
+echo "Test 1: Memory Directory"\n\
+if [ -d "$HOME/.opencode/memory" ]; then\n\
+    echo "  ✓ Memory directory exists"\n\
+    ls -la $HOME/.opencode/memory/\n\
+else\n\
+    echo "  ✗ Memory directory not found"\n\
+    exit 1\n\
+fi\n\
+echo ""\n\
+echo "Test 2: Configuration File"\n\
+if [ -f "$HOME/.opencode/memory/memory-config.json" ]; then\n\
+    echo "  ✓ Config file exists"\n\
+    cat $HOME/.opencode/memory/memory-config.json\n\
+else\n\
+    echo "  ✗ Config file not found"\n\
+    exit 1\n\
+fi\n\
+echo ""\n\
+echo "Test 3: Memory Files Count"\n\
+FILE_COUNT=$(ls $HOME/.opencode/memory/*.md 2>/dev/null | wc -l)\n\
+echo "  Found $FILE_COUNT memory files"\n\
+if [ "$FILE_COUNT" -ge 9 ]; then\n\
+    echo "  ✓ All 9 core files present"\n\
+else\n\
+    echo "  ⚠ Expected 9 files, found $FILE_COUNT"\n\
+fi\n\
+echo ""\n\
+echo "========================================="\n\
+echo "  ✅ Docker Test Complete!"\n\
+echo "========================================="\n\
+' > /usr/src/app/run-tests.sh && chmod +x /usr/src/app/run-tests.sh
+
+# Default command
+CMD ["/bin/sh", "/usr/src/app/run-tests.sh"]

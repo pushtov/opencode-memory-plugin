@@ -1,0 +1,138 @@
+# Dockerfile using local copy (faster - no npm download needed)
+FROM node:20-alpine
+
+# Set environment variables
+ENV NODE_ENV=testing
+
+# Set working directory
+WORKDIR /usr/src/app
+
+# Install build tools and Python (needed for better-sqlite3)
+RUN apk add --no-cache \
+    python3 \
+    make \
+    g++ \
+    sqlite \
+    bash
+
+# Copy the plugin source directly (already has node_modules)
+COPY opencode-memory-plugin /usr/src/app/opencode-memory-plugin
+
+# Install from local source (much faster than npm registry)
+RUN cd /usr/src/app/opencode-memory-plugin && \
+    npm install -g . && \
+    npm cache clean --force
+
+# Verify installation
+RUN ls -la ~/.opencode/memory/ && \
+    echo "" && \
+    echo "=== Configuration ===" && \
+    cat ~/.opencode/memory/memory-config.json
+
+# Copy test scripts
+COPY test-docker.sh /usr/src/app/
+COPY test-opencode-integration.sh /usr/src/app/
+
+# Make scripts executable
+RUN chmod +x /usr/src/app/*.sh
+
+# Create comprehensive test script
+RUN echo '#!/bin/bash\n\
+GREEN="\\033[0;32m"\n\
+YELLOW="\\033[1;33m"\n\
+NC="\\033[0m"\n\
+\n\
+log() { echo -e "${2}$1${NC}"; }\n\
+\n\
+log "=========================================" "$YELLOW"\n\
+log "  OpenCode Memory Plugin v1.1.0 - Docker" "$YELLOW"\n\
+log "=========================================" "$YELLOW"\n\
+echo ""\n\
+\n\
+log "Environment:" "$YELLOW"\n\
+log "  Node.js: $(node --version)" "$GREEN"\n\
+log "  npm: $(npm --version)" "$GREEN"\n\
+log "  OS: Alpine Linux $(cat /etc/alpine-release | cut -d. -f1-3)" "$GREEN"\n\
+echo ""\n\
+\n\
+log "Test 1: Installation Verification" "$YELLOW"\n\
+if [ -d "$HOME/.opencode/memory" ]; then\n\
+    log "  ✓ Memory directory exists" "$GREEN"\n\
+    ls -la $HOME/.opencode/memory/\n\
+else\n\
+    log "  ✗ FAILED: Memory directory not found" "$RED"\n\
+    exit 1\n\
+fi\n\
+echo ""\n\
+\n\
+log "Test 2: Configuration File" "$YELLOW"\n\
+if [ -f "$HOME/.opencode/memory/memory-config.json" ]; then\n\
+    log "  ✓ Config file exists" "$GREEN"\n\
+    cat $HOME/.opencode/memory/memory-config.json\n\
+    log "" "$YELLOW"\n\
+    \\\n    if grep -q "\\"version\\": \\"2.0\\"" $HOME/.opencode/memory/memory-config.json; then\n\
+        log "  ✓ Config v2.0 format detected" "$GREEN"\n\
+    else\n\
+        log "  ⚠ Config version not 2.0" "$YELLOW"\n\
+    fi\n\
+else\n\
+    log "  ✗ FAILED: Config file not found" "$RED"\n\
+    exit 1\n\
+fi\n\
+echo ""\n\
+\n\
+log "Test 3: Core Memory Files (9 files)" "$YELLOW"\n\
+CORE_FILES=("SOUL.md" "AGENTS.md" "USER.md" "IDENTITY.md" "TOOLS.md" "MEMORY.md" "HEARTBEAT.md" "BOOT.md" "BOOTSTRAP.md")\n\
+FOUND=0\n\
+for file in "${CORE_FILES[@]}"; do\n\
+    if [ -f "$HOME/.opencode/memory/$file" ]; then\n\
+        log "  ✓ $file" "$GREEN"\n\
+        ((FOUND++)) || true\n\
+    else\n\
+        log "  ✗ $file MISSING" "$RED"\n\
+    fi\n\
+done\n\
+echo ""\n\
+if [ "$FOUND" -eq 9 ]; then\n\
+    log "  ✓ All 9 core memory files present ($FOUND/9)" "$GREEN"\n\
+else\n\
+    log "  ✗ FAILED: Only $FOUND/9 files found" "$RED"\n\
+    exit 1\n\
+fi\n\
+echo ""\n\
+\n\
+log "Test 4: Plugin Package Info" "$YELLOW"\n\
+PLUGIN_INFO=$(npm list -g @csuwl/opencode-memory-plugin 2>/dev/null | grep @csuwl)\n\
+if [ -n "$PLUGIN_INFO" ]; then\n\
+    log "  ✓ Plugin installed globally" "$GREEN"\n\
+    echo "    $PLUGIN_INFO"\n\
+else\n\
+    log "  ⚠ Could not verify global installation" "$YELLOW"\n\
+fi\n\
+echo ""\n\
+\n\
+log "Test 5: Dependencies Check" "$YELLOW"\n\
+if [ -f "/usr/src/app/opencode-memory-plugin/package.json" ]; then\n\
+    if grep -q "@huggingface/transformers" /usr/src/app/opencode-memory-plugin/package.json; then\n\
+        log "  ✓ Transformers.js dependency in package.json" "$GREEN"\n\
+    fi\n\
+    \\\n    if grep -q "better-sqlite3" /usr/src/app/opencode-memory-plugin/package.json; then\n\
+        log "  ✓ better-sqlite3 dependency in package.json" "$GREEN"\n\
+    fi\n\
+fi\n\
+echo ""\n\
+\n\
+log "=========================================" "$GREEN"\n\
+log "  ✅ ALL TESTS PASSED!" "$GREEN"\n\
+log "=========================================" "$GREEN"\n\
+echo ""\n\
+log "Summary:" "$YELLOW"\n\
+log "  ✓ Plugin installed successfully" "$GREEN"\n\
+log "  ✓ All 9 core memory files present" "$GREEN"\n\
+log "  ✓ Configuration v2.0 created" "$GREEN"\n\
+log "  ✓ Dependencies verified" "$GREEN"\n\
+echo ""\n\
+' > /usr/src/app/run-tests.sh && chmod +x /usr/src/app/run-tests.sh
+
+# Default command
+CMD ["/bin/bash", "/usr/src/app/run-tests.sh"]

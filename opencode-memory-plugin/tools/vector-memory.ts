@@ -152,9 +152,7 @@ async function getEmbedding(text: string): Promise<number[]> {
   } catch (error) {
     console.error('Embedding generation failed, using fallback:', error)
     
-    // Get fallback mode from config
-    const config = await getConfig()
-    const fallbackMode = config.embedding.fallbackMode
+    // Get fallback mode from config (config already declared above)
     
     if (fallbackMode === 'error') {
       throw new Error(`Embedding generation failed: ${error}`)
@@ -164,10 +162,7 @@ async function getEmbedding(text: string): Promise<number[]> {
       throw new Error('BM25_FALLBACK')  // Signal to use BM25-only search
     }
     
-    // Default: hash-based fallback
-    const config = await getConfig()
-    const modelInfo = config.models.available[currentModelName!]
-    const dimensions = modelInfo?.dimensions || 384
+    // Default: hash-based fallback (config already available)
     
     const words = text.toLowerCase().split(/\s+/)
     const fallbackEmbedding: number[] = []
