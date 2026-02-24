@@ -1,0 +1,111 @@
+# Changelog
+
+All notable changes to OpenCode Memory Plugin will be documented in this file.
+
+## [1.1.1] - 2026-02-24
+
+### Bug Fixes
+- Fixed duplicate config declarations in `tools/vector-memory.ts`
+  - Removed redundant `const config` declarations at lines 156 and 168
+  - This fixes potential variable scope issues during embedding fallback
+
+### Docker Environment
+- Added comprehensive Docker testing environment
+- Created multiple Dockerfile variants:
+  - `Dockerfile` - Standard Docker testing
+  - `Dockerfile.alpine` - Alpine Linux variant
+  - `Dockerfile.fixed` - Platform-specific installation (fixes sharp/onnx issues)
+  - `Dockerfile.local` - Local source code installation
+  - `Dockerfile.opencode` - Complete OpenCode environment testing
+  - `Dockerfile.minimal` - Minimal dependencies
+  - `Dockerfile.multi` - Multi-stage build
+  - `Dockerfile.simple` - npm registry installation
+- Added `docker-compose.yml` for container orchestration
+- Added `.dockerignore` for build optimization
+
+### Testing
+- Added comprehensive test scripts:
+  - `test-docker.sh` - Basic Docker environment tests
+  - `test-functional.sh` - Complete functional test suite
+  - `test-embeddings.sh` - Vector embedding tests
+  - `test-docker-summary.sh` - Test summary report
+- Real-world test scenarios documented
+- Test automation infrastructure
+
+### Documentation
+- Added `DOCKER_TEST_RESULTS.md` - Docker environment test results
+- Added `FUNCTIONAL_TEST_RESULTS.md` - Functional testing detailed report
+- Added `OPENCODE_REAL_TEST_REPORT.md` - OpenCode integration test results
+- Added `PLATFORM_COMPATIBILITY_FIXED.md` - Platform compatibility solution guide
+- Added `TEST_CASES_DETAIL.md` - Complete test cases documentation
+- Added `PROJECT_COMPLETE.md` - Project completion summary
+- Added various summary and completion documents
+
+### Platform Compatibility
+- Identified and documented sharp/onnxruntime-node platform issues
+- Explained npm's optionalDependencies mechanism
+- Documented correct Docker installation methods
+- Provided solutions for cross-platform development
+
+### Improvements
+- Enhanced error messages in test scripts
+- Better documentation structure
+- Comprehensive test coverage
+- Real-world usage examples
+
+### Technical Details
+- Package size: 30.3 kB
+- Unpacked size: 119.3 kB
+- Total files: 23
+- Dependencies: 4 main, 2 dev
+- Node.js compatibility: ^18.17.0, ^20.3.0, >=21.0
+
+## [1.1.0] - 2026-02-24
+
+### Major Features
+- ✨ True semantic search with @huggingface/transformers
+- ✨ Flexible configuration system (v2.0)
+- ✨ 5 embedding models available
+- ✨ 4 search modes (hybrid, vector, bm25, hash)
+- ✨ TypeScript support added
+- ✨ Uninstall script included
+- ✨ Complete documentation
+
+### New Features
+- Implemented true vector embeddings using Transformers.js
+- Created configuration system v2.0
+- Added support for 5 embedding models:
+  - Xenova/all-MiniLM-L6-v2 (default, 80MB)
+  - Xenova/bge-small-en-v1.5 (recommended, 130MB)
+  - Xenova/bge-base-en-v1.5 (best quality, 400MB)
+  - Xenova/e5-small-v2 (Q&A optimized, 130MB)
+  - Xenova/nomic-embed-text-v1.5 (long documents, 270MB)
+- Added 4 search modes:
+  - hybrid (default, 70% vector + 30% BM25)
+  - vector (vector-only search)
+  - bm25 (keyword-only search)
+  - hash (fallback hash-based search)
+- Configurable fallback modes
+- Auto-indexing with configurable chunk size
+- Automatic consolidation settings
+
+### Documentation
+- Added `CONFIGURATION.md` with complete configuration guide
+- Updated README with npm installation badges
+- Added detailed usage examples
+- Added configuration comparison tables
+
+### Installation
+- npm global installation now supported
+- Automatic configuration on install
+- Memory directory structure auto-created
+- OpenCode configuration updated automatically
+
+---
+
+## Version Summary
+
+| Version | Date | Type | Changes |
+|--------|------|------|---------|
+| 1.1.1 | 2026-02-24 | Patch | Bug fix, testing, documentation |
+| 1.1.0 | 2026-02-24 | Major | True vector search, config v2.0 |

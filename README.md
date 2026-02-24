@@ -283,10 +283,20 @@ MIT License - see [LICENSE](LICENSE) for details
 - ✨ Uninstall script
 - ✨ Complete documentation
 
-For detailed changes, see [CHANGELOG.md](https://github.com/opencode-memory-plugin/blob/main/CHANGELOG.md).
+For detailed changes, see [CHANGELOG.md](https://github.com/csu/memory-plugin/blob/main/CHANGELOG.md).
+
+### Latest Release: v1.1.1 (2026-02-24)
+
+**Highlights**:
+- 🐛 Fixed duplicate config declarations bug
+- 🐳 Added comprehensive Docker testing
+- 🧪 Added functional and integration tests
+- 📝 Added complete documentation
+
+**Installation**:
+```bash
+npm install -g @csuwl/opencode-memory-plugin@1.1.1
+```
 
 ---
-
-**Made with ❤️ for OpenCode community**
-
 *Your OpenCode instance now has perfect memory with true semantic understanding! 🧠✨*
