@@ -22,13 +22,14 @@
     "semantic-search"
   ],
   "dependencies": {
-    "@opencode-ai/plugin": "latest",
-    "better-sqlite3": "latest",
-    "sqlite-vec": "latest"
+    "@opencode-ai/plugin": "^1.0.0",
+    "@huggingface/transformers": "^3.8.1",
+    "better-sqlite3": "^11.7.0",
+    "sqlite-vec": "^0.1.1"
   },
   "devDependencies": {
-    "@types/node": "latest",
-    "typescript": "latest"
+    "@types/node": "^22.10.5",
+    "typescript": "^5.7.3"
   },
   "files": [
     "memory/",
