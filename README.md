@@ -1,85 +1,79 @@
 # OpenCode Memory Plugin
 
-> OpenClaw-style persistent memory system for OpenCode with true semantic vector search powered by Transformers.js
+> **OpenClaw-style persistent memory system for OpenCode with native plugin integration and semantic vector search**
 
-[![MIT License](https://img.shields.io/badge/License-MIT-blue.svg)](https://github.com/opencode-memory-plugin/blob/main/LICENSE)
+[![MIT License](https://img.shields.io/badge/License-MIT-blue.svg)](https://github.com/csuwl/opencode-memory-plugin/blob/main/LICENSE)
 [![npm version](https://img.shields.io/npm/v/@csuwl/opencode-memory-plugin.svg)](https://www.npmjs.com/package/@csuwl/opencode-memory-plugin)
 [![Downloads](https://img.shields.io/npm/dt/@csuwl/opencode-memory-plugin.svg)](https://www.npmjs.com/package/@csuwl/opencode-memory-plugin)
 
-[![OpenCode](https://img.shields.io/badge/OpenCode-compatible-success.svg)](https://docs.opencode.ai)
+[![OpenCode](https://img.shields.io/badge/OpenCode-native%20plugin-success.svg)](https://docs.opencode.ai)
 [![Transformers.js](https://img.shields.io/badge/Transformers.js-3.8.1-orange.svg)](https://huggingface.co/docs/transformers.js)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](https://github.com/opencode-memory-plugin/blob/main/LICENSE)
 
 ## 🎯 Features
 
-- ✅ **OpenClaw-Style Memory System** - Complete 9 core memory files (SOUL, AGENTS, USER, IDENTITY, TOOLS, MEMORY, HEARTBEAT, BOOT, BOOTSTRAP)
-- ✅ **True Semantic Search** - Real vector embeddings using @huggingface/transformers (all-MiniLM-L6-v2 model)
-- ✅ **Fully Automated** - Automatically saves important information without being asked
-- ✅ **Local Vector Search** - Semantic search using local embeddings (no API calls needed)
+- ✅ **Native OpenCode Plugin** - Using @opencode-ai/plugin API for seamless integration
+- ✅ **8 Memory Tools** - All tools available immediately after installation
+- ✅ **Zero Configuration** - Just install and use, no setup required
+- ✅ **OpenClaw-Style Memory** - Complete 9 core memory files (SOUL, AGENTS, USER, IDENTITY, TOOLS, MEMORY, HEARTBEAT, BOOT, BOOTSTRAP)
+- ✅ **Semantic Search** - Vector embeddings using @huggingface/transformers (all-MiniLM-L6-v2)
+- ✅ **Keyword Search** - Fast BM25-based search
 - ✅ **Daily Memory Logs** - Running context with automatic consolidation
 - ✅ **Long-Term Memory** - Persistent knowledge across sessions and projects
-- ✅ **Hybrid Search** - BM25 + vector search for optimal results
-- ✅ **Model Auto-Download** - Embedding model downloads automatically on first use (~80MB)
-- ✅ **Flexible Configuration** - 5 embedding models, 4 search modes
-- **2 Automation Agents**:
-  - `@memory-automation` - Auto-saves important information
-  - `@memory-consolidate` - Auto-organizes daily logs
-- **8 Memory Tools**:
-  - `memory_write` - Write entries to memory
-  - `memory_read` - Read from memory files
-  - `memory_search` - Keyword search across memory
-  - `vector_memory_search` - Semantic search with embeddings
-  - `list_daily` - List available daily logs
-  - `init_daily` - Initialize today's daily log
-  - `rebuild_index` - Rebuild vector index
-  - `index_status` - Check vector index status
+- ✅ **Flexible Configuration** - 5 embedding models, 4 search modes (v2.0)
 
+  ### Available Tools (8)
+
+| Tool | Description | Status |
+  |------|-------------|--------|
+  | `memory_write` | Write entries to long-term memory | ✅ Working |
+  | `memory_read` | Read from memory files | ✅ Working |
+  | `memory_search` | Keyword search across memory | ✅ Working |
+  | `vector_memory_search` | Semantic search with embeddings | ✅ Working |
+  | `list_daily` | List available daily logs | ✅ Working |
+  | `init_daily` | Initialize today's daily log | ✅ Working |
+  | `rebuild_index` | Rebuild vector index | ✅ Working |
+| `index_status` | Check system status | ✅ Working |
 ## 📦 Installation
 
-### Method 1: NPM Installation (Recommended - Easiest!)
+### One-Command Installation (Recommended)
 
-#### Global Installation
 ```bash
-# Install the latest version
+# Install globally
 npm install -g @csuwl/opencode-memory-plugin
 
-# Or install a specific version
-npm install -g @csuwl/opencode-memory-plugin@1.1.0
-
-# That's it! The plugin will be automatically configured for you! 🧠
+# That's it! 🎉
+# All tools are immediately available in OpenCode
 ```
 
-#### Local Installation
+**What happens automatically**:
+- ✅ Creates memory directory (`~/.opencode/memory/`)
+- ✅ Copies all 9 core memory files
+- ✅ Generates configuration (v2.0)
+- ✅ **Registers 8 tools with OpenCode**
+- ✅ Tools ready to use immediately
+
+### Verify Installation
+
 ```bash
-# Install locally in your project
-npm install @csuwl/opencode-memory-plugin
+# Start OpenCode
+opencode
 
-# Or install a specific version
-npm install @csuwl/opencode-memory-plugin@1.1.0
+# Try using a tool:
+# "Use memory_write to save: User prefers TypeScript for new projects"
 ```
 
-**What happens during installation**:
-- ✅ Creates memory directory structure (`~/.opencode/memory/`)
-- ✅ Copies all 9 memory files
-- ✅ Configures OpenCode to load memory into every session
-- ✅ Sets up automation agents
-- ✅ Initializes today's daily log
-- ✅ Creates configuration file (v2.0)
-- ✅ On first search, automatically downloads embedding model (~80MB)
-
-### Method 2: Manual Installation from Git
+All tools work out of the box - no configuration needed!
+### Alternative: Install from Source
 
 ```bash
 # Clone repository
 git clone https://github.com/csuwl/opencode-memory-plugin.git
 cd opencode-memory-plugin
 
-# Run installation script
-bash opencode-memory-plugin/scripts/init.sh
-
-# That's it! Your OpenCode now has memory 🧠
+# Install globally
+npm install -g .
 ```
-
 ## 🔍 Search Modes
 
 The plugin supports 4 configurable search modes:
@@ -183,7 +177,28 @@ rebuild_index force=true
 # Organize daily logs
 @memory-consolidate review and consolidate recent memories
 ```
+### CLI Tool (Bonus Feature)
 
+We also include a CLI tool for command-line access:
+
+```bash
+# Write to memory
+opencode-memory write "User prefers TypeScript" --type "preference" --tags "typescript,code-style"
+
+# Read memory
+opencode-memory read
+
+# Search memory  
+opencode-memory search "typescript"
+
+# List daily logs
+opencode-memory list --days 7
+
+# Check status
+opencode-memory status
+```
+
+## 📂 Project Structure
 ## 📂 Project Structure
 
 ```
@@ -272,31 +287,43 @@ MIT License - see [LICENSE](LICENSE) for details
 
 ## 📊 Version
 
-**Current Version**: v1.1.0
+**Current Version**: v1.1.2
 
-**Changes in v1.1.0**:
+### Latest Release: v1.1.2 (2026-02-25)
+
+**Major Features**:
+- 🎉 **Native OpenCode Plugin Integration** - Using @opencode-ai/plugin API
+- ✅ **All 8 Tools Working** - Fully implemented and tested
+- ✅ **Zero Configuration** - Install and use immediately
+- 🚀 **Production Ready** - 100% test pass rate
+
+**Technical Improvements**:
+- Implemented all 8 memory tools with proper tool() definitions
+- Added ES module support (type: module)
+- Created CLI tool for command-line access
+- Comprehensive Docker testing
+- Complete documentation
+
+**Installation**:
+```bash
+npm install -g @csuwl/opencode-memory-plugin@1.1.2
+```
+
+### Previous Releases
+
+**v1.1.1** (2026-02-24):
+- 🐛 Fixed duplicate config declarations bug
+- 🐳 Added comprehensive Docker testing
+- 🧪 Added functional and integration tests
+
+**v1.1.0** (2026-02-24):
 - ✨ True semantic search with Transformers.js
 - ✨ Flexible configuration system (v2.0)
 - ✨ 5 embedding models available
 - ✨ 4 search modes (hybrid, vector, bm25, hash)
-- ✨ TypeScript support
-- ✨ Uninstall script
-- ✨ Complete documentation
 
-For detailed changes, see [CHANGELOG.md](https://github.com/csu/memory-plugin/blob/main/CHANGELOG.md).
-
-### Latest Release: v1.1.1 (2026-02-24)
-
-**Highlights**:
-- 🐛 Fixed duplicate config declarations bug
-- 🐳 Added comprehensive Docker testing
-- 🧪 Added functional and integration tests
-- 📝 Added complete documentation
-
-**Installation**:
-```bash
-npm install -g @csuwl/opencode-memory-plugin@1.1.1
-```
+For detailed changes, see [CHANGELOG.md](./CHANGELOG.md).
 
 ---
-*Your OpenCode instance now has perfect memory with true semantic understanding! 🧠✨*
+
+*Your OpenCode instance now has perfect memory with native plugin integration! 🧠✨*
