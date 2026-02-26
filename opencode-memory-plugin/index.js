@@ -2,21 +2,21 @@
  * OpenCode Memory Plugin
  * 
  * This package provides an OpenClaw-style memory system for OpenCode
- * with full automation and local vector search capabilities.
+ * with full automation and real vector search capabilities.
  * 
  * Installation is handled automatically by the bin/install.cjs script
  * which runs on npm install.
  * 
  * @package @csuwl/opencode-memory-plugin
- * @version 1.1.3
+ * @version 1.2.0
  * @author csuwl <1105865632@qq.com>
  * @license MIT
  */
 
 export const pluginInfo = {
   name: '@csuwl/opencode-memory-plugin',
-  version: '1.1.3',
-  description: 'OpenClaw-style memory system for OpenCode with full automation and local vector search',
+  version: '1.2.0',
+  description: 'OpenClaw-style memory system for OpenCode with full automation and real vector search',
   
   /**
    * Memory files location

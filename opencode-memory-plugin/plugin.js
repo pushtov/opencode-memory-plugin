@@ -1,6 +1,7 @@
 import { tool } from '@opencode-ai/plugin/tool';
 import fs from 'fs';
 import path from 'path';
+import { getVectorStore } from './lib/vector-store.js';
 
 const HOME = process.env.HOME || process.env.USERPROFILE;
 const MEMORY_DIR = path.join(HOME, '.opencode', 'memory');
@@ -18,6 +19,40 @@ function getConfig() {
   } catch (e) {
     return null;
   }
+}
+
+/**
+ * Get all memory files to index
+ */
+function getMemoryFiles() {
+  const files = [];
+  
+  // Core memory files
+  const coreFiles = ['MEMORY.md', 'SOUL.md', 'AGENTS.md', 'USER.md', 'IDENTITY.md', 'TOOLS.md'];
+  for (const file of coreFiles) {
+    const filePath = path.join(MEMORY_DIR, file);
+    if (fs.existsSync(filePath)) {
+      files.push({ path: filePath, name: file });
+    }
+  }
+  
+  // Daily logs
+  if (fs.existsSync(DAILY_DIR)) {
+    const dailyFiles = fs.readdirSync(DAILY_DIR)
+      .filter(f => f.endsWith('.md'))
+      .sort()
+      .reverse()
+      .slice(0, 30); // Last 30 days
+    
+    for (const file of dailyFiles) {
+      files.push({ 
+        path: path.join(DAILY_DIR, file), 
+        name: `daily/${file}` 
+      });
+    }
+  }
+  
+  return files;
 }
 
 /**
@@ -161,61 +196,99 @@ ${content}
       }),
 
       vector_memory_search: tool({
-        description: "Search memory using semantic vector search. Requires embedding model to be loaded.",
+        description: "Search memory using semantic vector search. Finds relevant content even when keywords don't match exactly.",
         args: {
           query: tool.schema.string().describe("The semantic search query"),
-          mode: tool.schema.string().optional().default("hybrid").describe("Search mode: 'vector', 'bm25', 'hybrid', or 'hash'")
+          mode: tool.schema.string().optional().default("hybrid").describe("Search mode: 'vector' (semantic only), 'keyword' (exact match), or 'hybrid' (both)"),
+          limit: tool.schema.number().optional().default(10).describe("Maximum number of results to return"),
+          threshold: tool.schema.number().optional().default(0.3).describe("Minimum similarity score (0-1)")
         },
         async execute(args) {
+          const { query, mode, limit, threshold } = args;
+          
           try {
-            const { query, mode } = args;
             const config = getConfig();
 
             if (!config) {
               return {
                 success: false,
-                error: "Memory configuration not found"
+                error: "Memory configuration not found. Please run the initialization script."
               };
             }
 
             // Check if embedding is enabled
-            if (!config.embedding?.enabled) {
+            if (!config.embedding?.enabled && config.embedding?.enabled !== undefined) {
               return {
                 success: false,
-                error: "Embedding is not enabled in configuration",
+                error: "Embedding is disabled in configuration",
                 suggestion: "Try using memory_search for keyword search instead"
               };
             }
 
-            // For now, return basic search results
-            // TODO: Implement actual vector search
-            const filePath = path.join(MEMORY_DIR, 'MEMORY.md');
-            const content = fs.readFileSync(filePath, 'utf-8');
-            const lines = content.split('\n');
-
-            const matches = [];
-            lines.forEach((line, index) => {
-              if (line.toLowerCase().includes(query.toLowerCase())) {
-                matches.push({
-                  line: index + 1,
-                  text: line.trim(),
-                  score: 0.5 // Placeholder score
-                });
+            // Get vector store instance
+            const vectorStore = getVectorStore();
+            
+            // Initialize if needed
+            let initResult;
+            if (!vectorStore.initialized) {
+              initResult = await vectorStore.initialize({ 
+                model: config.embedding?.model 
+              });
+              
+              if (!initResult.success) {
+                // Fall back to keyword search
+                return {
+                  success: true,
+                  query,
+                  mode: 'keyword',
+                  matches: await fallbackKeywordSearch(query, limit),
+                  count: (await fallbackKeywordSearch(query, limit)).length,
+                  note: `Vector search unavailable: ${initResult.error}. Using keyword search instead.`
+                };
               }
-            });
+            }
+
+            // Perform search based on mode
+            let results;
+            const searchMode = mode || config.search?.mode || 'hybrid';
+            
+            if (searchMode === 'vector') {
+              results = await vectorStore.search(query, { limit, threshold });
+            } else if (searchMode === 'keyword') {
+              results = vectorStore.keywordSearch(query, { limit });
+            } else {
+              // Hybrid mode (default)
+              results = await vectorStore.hybridSearch(query, { 
+                limit,
+                vectorWeight: config.search?.options?.hybrid?.vectorWeight || 0.7,
+                keywordWeight: config.search?.options?.hybrid?.keywordWeight || 0.3
+              });
+            }
 
             return {
               success: true,
               query,
-              mode: mode || config.search?.mode || 'hybrid',
-              matches: matches.slice(0, 10),
-              count: matches.length,
-              note: "Vector search not fully implemented, using keyword search"
+              mode: searchMode,
+              matches: results.map(r => ({
+                source: r.source,
+                line: r.line,
+                text: r.content.substring(0, 200) + (r.content.length > 200 ? '...' : ''),
+                score: Math.round(r.score * 100) / 100,
+                fullContent: r.content
+              })),
+              count: results.length,
+              model: vectorStore.modelName,
+              indexed: vectorStore.getIndexedCount()
             };
           } catch (e) {
+            // Fall back to keyword search on error
             return {
-              success: false,
-              error: e.message
+              success: true,
+              query,
+              mode: 'keyword',
+              matches: await fallbackKeywordSearch(query, 10),
+              count: (await fallbackKeywordSearch(query, 10)).length,
+              note: `Vector search failed: ${e.message}. Using keyword search.`
             };
           }
         }
@@ -322,21 +395,87 @@ ${content}
       }),
 
       rebuild_index: tool({
-        description: "Rebuild the vector search index for all memory files.",
+        description: "Rebuild the vector search index for all memory files. This processes all memory files and creates embeddings for semantic search.",
         args: {
           force: tool.schema.boolean().optional().default(false).describe("Force rebuild even if index exists")
         },
         async execute(args) {
           try {
             const { force } = args;
+            const config = getConfig();
 
-            // TODO: Implement actual index rebuild
+            if (!config) {
+              return {
+                success: false,
+                error: "Memory configuration not found. Please run the initialization script."
+              };
+            }
+
+            // Get vector store instance
+            const vectorStore = getVectorStore();
+            
+            // Initialize
+            const initResult = await vectorStore.initialize({ 
+              model: config.embedding?.model 
+            });
+            
+            if (!initResult.success) {
+              return {
+                success: false,
+                error: `Failed to initialize vector store: ${initResult.error}`,
+                fallback: initResult.fallback
+              };
+            }
+
+            // Clear existing index if force rebuild
+            if (force) {
+              vectorStore.clearIndex();
+            }
+
+            // Get all memory files
+            const files = getMemoryFiles();
+            
+            if (files.length === 0) {
+              return {
+                success: true,
+                message: "No memory files found to index",
+                indexedFiles: 0,
+                totalChunks: 0
+              };
+            }
+
+            // Index each file
+            const results = [];
+            let totalChunks = 0;
+            
+            for (const file of files) {
+              try {
+                const content = fs.readFileSync(file.path, 'utf-8');
+                const result = await vectorStore.indexDocument(content, file.name, {
+                  clearExisting: true,
+                  chunkSize: config.indexing?.chunkSize || 400,
+                  overlap: config.indexing?.chunkOverlap || 80
+                });
+                results.push({ file: file.name, indexed: result.indexed });
+                totalChunks += result.indexed;
+              } catch (e) {
+                results.push({ file: file.name, error: e.message });
+              }
+            }
+
+            // Get final status
+            const status = vectorStore.getStatus();
+
             return {
               success: true,
-              message: "Index rebuild initiated",
+              message: "Index rebuild completed",
               force,
-              note: "Vector index rebuild not fully implemented",
-              status: "pending"
+              model: status.model,
+              dimensions: status.dimensions,
+              indexedFiles: files.length,
+              totalChunks,
+              results,
+              lastIndexed: status.lastIndexed
             };
           } catch (e) {
             return {
@@ -379,19 +518,35 @@ ${content}
               dailyLogCount = dailyFiles.length;
             }
 
+            // Get vector store status
+            const vectorStore = getVectorStore();
+            let vectorStatus = { initialized: false };
+            
+            try {
+              vectorStatus = vectorStore.getStatus();
+            } catch (e) {
+              // Vector store not initialized
+            }
+
             return {
               success: true,
               config: {
                 version: config.version,
                 searchMode: config.search?.mode,
-                embeddingEnabled: config.embedding?.enabled,
-                embeddingModel: config.embedding?.model,
+                embeddingEnabled: config.embedding?.enabled !== false,
+                embeddingModel: config.embedding?.model || 'Xenova/all-MiniLM-L6-v2',
                 fallbackMode: config.embedding?.fallbackMode
               },
               files,
               dailyLogCount,
-              indexStatus: "not_built",
-              note: "Vector indexing not fully implemented"
+              vectorIndex: {
+                initialized: vectorStatus.initialized || false,
+                model: vectorStatus.model || null,
+                dimensions: vectorStatus.dimensions || 384,
+                totalChunks: vectorStatus.totalChunks || 0,
+                lastIndexed: vectorStatus.lastIndexed || null,
+                dbPath: vectorStatus.dbPath || null
+              }
             };
           } catch (e) {
             return {
@@ -404,3 +559,33 @@ ${content}
     }
   };
 };
+
+/**
+ * Fallback keyword search when vector search is unavailable
+ */
+async function fallbackKeywordSearch(query, limit = 10) {
+  const matches = [];
+  const files = getMemoryFiles();
+  
+  for (const file of files) {
+    try {
+      const content = fs.readFileSync(file.path, 'utf-8');
+      const lines = content.split('\n');
+      
+      lines.forEach((line, index) => {
+        if (line.toLowerCase().includes(query.toLowerCase())) {
+          matches.push({
+            source: file.name,
+            line: index + 1,
+            text: line.trim().substring(0, 200) + (line.length > 200 ? '...' : ''),
+            score: 0.5
+          });
+        }
+      });
+    } catch (e) {
+      // Skip files that can't be read
+    }
+  }
+  
+  return matches.slice(0, limit);
+}
