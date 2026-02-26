@@ -5,6 +5,7 @@
  * - @huggingface/transformers for embeddings
  * - sqlite-vec for vector storage
  * - better-sqlite3 for database
+ * - BM25 for fallback keyword search
  */
 
 import { pipeline, cos_sim } from '@huggingface/transformers';
@@ -12,7 +13,7 @@ import Database from 'better-sqlite3';
 import { load as loadVec } from 'sqlite-vec';
 import fs from 'fs';
 import path from 'path';
-
+import { BM25Index, createBM25Index } from './bm25.js';
 const HOME = process.env.HOME || process.env.USERPROFILE;
 const MEMORY_DIR = path.join(HOME, '.opencode', 'memory');
 const VECTOR_DB = path.join(MEMORY_DIR, 'vector-index.db');
@@ -493,9 +494,10 @@ export class VectorStore {
   }
 
   /**
-   * Keyword search (BM25-like fallback)
+   * BM25 search (keyword-based with TF-IDF scoring)
+   * Falls back from vector search when embedding model is unavailable
    */
-  keywordSearch(query, options = {}) {
+  bm25Search(query, options = {}) {
     const { limit = 10, sourceFile = null } = options;
     const terms = query.toLowerCase().split(/\s+/).filter(t => t.length > 1);
     
@@ -503,46 +505,46 @@ export class VectorStore {
       return [];
     }
 
-    // Build LIKE conditions
-    const conditions = terms.map(t => `d.content LIKE ?`).join(' OR ');
-    const params = terms.map(t => `%${t}%`);
-    
-    let sql = `
-      SELECT 
-        d.id,
-        d.content,
-        d.source_file,
-        d.line_number
-      FROM documents d
-      WHERE (${conditions})
-    `;
+    // Get all documents for BM25 indexing
+    let sql = `SELECT id, content, source_file, line_number FROM documents`;
+    const params = [];
     
     if (sourceFile) {
-      sql += ` AND d.source_file = ?`;
+      sql += ` WHERE source_file = ?`;
       params.push(sourceFile);
     }
+
+    const docs = this.db.prepare(sql).all(...params);
     
-    sql += ` LIMIT ?`;
-    params.push(limit);
+    if (docs.length === 0) {
+      return [];
+    }
 
-    const results = this.db.prepare(sql).all(...params);
+    // Create BM25 index from documents
+    const documents = docs.map(d => ({
+      id: d.id,
+      content: d.content,
+      metadata: { source: d.source_file, line: d.line_number }
+    }));
+    
+    const index = createBM25Index(documents);
+    const results = index.search(query, { limit, minScore: 0.01 });
+    
+    return results.map(r => ({
+      id: r.id,
+      content: r.content,
+      source: r.metadata.source,
+      line: r.metadata.line,
+      score: Math.min(1, r.score / 10)  // Normalize score to 0-1 range
+    }));
+  }
 
-    // Calculate simple relevance score
-    return results.map(r => {
-      const lowerContent = r.content.toLowerCase();
-      let matches = 0;
-      for (const term of terms) {
-        const count = (lowerContent.match(new RegExp(term, 'g')) || []).length;
-        matches += count;
-      }
-      return {
-        id: r.id,
-        content: r.content,
-        source: r.source_file,
-        line: r.line_number,
-        score: Math.min(1, matches / 10)
-      };
-    });
+  /**
+   * Legacy keyword search (kept for compatibility)
+   * @deprecated Use bm25Search instead
+   */
+  keywordSearch(query, options = {}) {
+    return this.bm25Search(query, options);
   }
 
   /**

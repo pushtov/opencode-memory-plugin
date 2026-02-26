@@ -2,6 +2,7 @@ import { tool } from '@opencode-ai/plugin/tool';
 import fs from 'fs';
 import path from 'path';
 import { getVectorStore } from './lib/vector-store.js';
+import { BM25Index, createBM25Index } from './lib/bm25.js';
 
 const HOME = process.env.HOME || process.env.USERPROFILE;
 const MEMORY_DIR = path.join(HOME, '.opencode', 'memory');
@@ -562,24 +563,32 @@ ${content}
 };
 
 /**
- * Fallback keyword search when vector search is unavailable
+ * Fallback BM25 search when vector search is unavailable
+ * Uses BM25 algorithm for better relevance ranking
  */
-async function fallbackKeywordSearch(query, limit = 10) {
-  const matches = [];
+async function fallbackBM25Search(query, limit = 10) {
   const files = getMemoryFiles();
+  
+  // Collect all documents
+  const documents = [];
+  let docId = 0;
   
   for (const file of files) {
     try {
       const content = fs.readFileSync(file.path, 'utf-8');
       const lines = content.split('\n');
       
+      // Index each line as a separate document for better granularity
       lines.forEach((line, index) => {
-        if (line.toLowerCase().includes(query.toLowerCase())) {
-          matches.push({
-            source: file.name,
-            line: index + 1,
-            text: line.trim().substring(0, 200) + (line.length > 200 ? '...' : ''),
-            score: 0.5
+        const trimmedLine = line.trim();
+        if (trimmedLine.length > 10) {  // Skip very short lines
+          documents.push({
+            id: `${file.name}:${index + 1}`,
+            content: trimmedLine,
+            metadata: {
+              source: file.name,
+              line: index + 1
+            }
           });
         }
       });
@@ -588,5 +597,26 @@ async function fallbackKeywordSearch(query, limit = 10) {
     }
   }
   
-  return matches.slice(0, limit);
+  if (documents.length === 0) {
+    return [];
+  }
+  
+  // Create BM25 index and search
+  const index = createBM25Index(documents);
+  const results = index.search(query, { limit, minScore: 0.01 });
+  
+  return results.map(r => ({
+    source: r.metadata.source,
+    line: r.metadata.line,
+    text: r.content.substring(0, 200) + (r.content.length > 200 ? '...' : ''),
+    score: Math.min(1, r.score / 5)  // Normalize score to 0-1 range
+  }));
+}
+
+/**
+ * Legacy fallback keyword search (kept for compatibility)
+ * @deprecated Use fallbackBM25Search instead
+ */
+async function fallbackKeywordSearch(query, limit = 10) {
+  return fallbackBM25Search(query, limit);
 }
