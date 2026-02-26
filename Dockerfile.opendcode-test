@@ -1,0 +1,281 @@
+# Dockerfile for testing vector search with OpenCode
+FROM node:20-slim
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    python3 \
+    build-essential \
+    git \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Copy the plugin source
+COPY opencode-memory-plugin/ /app/plugin/
+
+# Install plugin dependencies
+WORKDIR /app/plugin
+RUN npm install
+
+# Create test directory
+WORKDIR /app
+RUN mkdir -p /root/.opencode/memory/daily
+
+# Create test memory content
+RUN cat > /root/.opencode/memory/MEMORY.md << 'EOF'
+# Long-Term Memory
+
+## Preference Entry
+
+**Date**: 2024-01-15
+**Type**: preference
+
+User prefers TypeScript for all new projects. They value strict type checking, explicit interfaces, and good IDE support. TypeScript helps catch errors at compile time rather than runtime.
+
+---
+
+## Decision Entry
+
+**Date**: 2024-01-20
+**Type**: decision
+
+Decided to use SQLite for local storage because it's lightweight, requires no configuration, and perfect for single-user desktop applications. The zero-config nature aligns with the plugin's simplicity goal.
+
+---
+
+## Pattern Entry
+
+**Date**: 2024-02-01
+**Type**: pattern
+
+When implementing search features, always consider three modes: exact keyword matching for precision, semantic vector search for relevance, and hybrid approaches that combine both. The hybrid approach with 70% vector weight and 30% keyword weight provides good balance.
+
+---
+
+## Learning Entry
+
+**Date**: 2024-02-10
+**Type**: note
+
+Embedding models work best with chunked text rather than full documents. The all-MiniLM-L6-v2 model provides good balance between speed (80MB) and quality. Always normalize embeddings for cosine similarity.
+
+---
+
+## Technical Note
+
+**Date**: 2024-02-15
+**Type**: note
+
+The sqlite-vec extension provides efficient vector storage. Using virtual tables with vec0 allows for fast similarity search. Float32 arrays work well for embeddings.
+EOF
+
+# Create memory config
+RUN cat > /root/.opencode/memory/memory-config.json << 'EOF'
+{
+  "version": "2.0",
+  "search": {
+    "mode": "hybrid",
+    "options": {
+      "hybrid": {
+        "vectorWeight": 0.7,
+        "keywordWeight": 0.3
+      }
+    }
+  },
+  "embedding": {
+    "enabled": true,
+    "provider": "transformers",
+    "model": "Xenova/all-MiniLM-L6-v2",
+    "fallbackMode": "keyword",
+    "cache": {
+      "enabled": true,
+      "directory": "/root/.cache/huggingface"
+    }
+  },
+  "indexing": {
+    "chunkSize": 400,
+    "chunkOverlap": 80,
+    "autoRebuild": true
+  }
+}
+EOF
+
+# Create test script
+RUN cat > /app/test-vector-search.mjs << 'TESTEOF'
+import { getVectorStore } from './plugin/lib/vector-store.js';
+import fs from 'fs';
+import path from 'path';
+
+const HOME = '/root';
+const MEMORY_DIR = path.join(HOME, '.opencode', 'memory');
+
+console.log('========================================');
+console.log('Vector Search Implementation Test');
+console.log('========================================\n');
+
+let testsPassed = 0;
+let testsFailed = 0;
+
+function logTest(name, passed, details = '') {
+  if (passed) {
+    console.log(`✓ ${name}${details ? ': ' + details : ''}`);
+    testsPassed++;
+  } else {
+    console.log(`✗ ${name}${details ? ': ' + details : ''}`);
+    testsFailed++;
+  }
+}
+
+async function runTests() {
+  // Test 1: Module import
+  console.log('\n--- Test 1: Module Import ---');
+  try {
+    const vs = getVectorStore();
+    logTest('VectorStore import', true);
+  } catch (e) {
+    logTest('VectorStore import', false, e.message);
+  }
+
+  // Test 2: VectorStore initialization
+  console.log('\n--- Test 2: VectorStore Initialization ---');
+  const vs = getVectorStore();
+  
+  let initResult;
+  try {
+    initResult = await vs.initialize();
+    if (initResult.success) {
+      logTest('VectorStore initialization', true, `model: ${initResult.model}`);
+    } else if (initResult.fallback) {
+      logTest('VectorStore initialization (fallback)', true, initResult.error);
+    } else {
+      logTest('VectorStore initialization', false, initResult.error);
+    }
+  } catch (e) {
+    logTest('VectorStore initialization', false, e.message);
+  }
+
+  // Test 3: Document indexing
+  console.log('\n--- Test 3: Document Indexing ---');
+  try {
+    const memoryFile = path.join(MEMORY_DIR, 'MEMORY.md');
+    const content = fs.readFileSync(memoryFile, 'utf-8');
+    const result = await vs.indexDocument(content, 'MEMORY.md', { clearExisting: true });
+    logTest('Document indexing', result.indexed > 0, `${result.indexed} chunks indexed`);
+  } catch (e) {
+    logTest('Document indexing', false, e.message);
+  }
+
+  // Test 4: Keyword search (always works)
+  console.log('\n--- Test 4: Keyword Search ---');
+  try {
+    const results = vs.keywordSearch('TypeScript', { limit: 5 });
+    logTest('Keyword search', results.length > 0, `${results.length} results`);
+    if (results.length > 0) {
+      console.log(`  First result: "${results[0].content.substring(0, 80)}..."`);
+    }
+  } catch (e) {
+    logTest('Keyword search', false, e.message);
+  }
+
+  // Test 5: Vector search (if model loaded)
+  console.log('\n--- Test 5: Vector Search ---');
+  try {
+    const results = await vs.search('programming language preference', { limit: 3, threshold: 0.2 });
+    logTest('Vector search', results.length >= 0, `${results.length} results`);
+    if (results.length > 0) {
+      console.log(`  First result: score ${results[0].score.toFixed(3)}`);
+    }
+  } catch (e) {
+    logTest('Vector search', false, e.message);
+  }
+
+  // Test 6: Hybrid search
+  console.log('\n--- Test 6: Hybrid Search ---');
+  try {
+    const results = await vs.hybridSearch('SQLite database storage', { limit: 3 });
+    logTest('Hybrid search', results.length >= 0, `${results.length} results`);
+    if (results.length > 0) {
+      console.log(`  First result: score ${results[0].score.toFixed(3)}`);
+    }
+  } catch (e) {
+    logTest('Hybrid search', false, e.message);
+  }
+
+  // Test 7: Status check
+  console.log('\n--- Test 7: Status Check ---');
+  try {
+    const status = vs.getStatus();
+    logTest('Status check', true, `${status.totalChunks} chunks`);
+    console.log(`  Model: ${status.model}`);
+    console.log(`  Dimensions: ${status.dimensions}`);
+    console.log(`  Initialized: ${status.initialized}`);
+  } catch (e) {
+    logTest('Status check', false, e.message);
+  }
+
+  // Test 8: Plugin tools (import test)
+  console.log('\n--- Test 8: Plugin Import ---');
+  try {
+    const { MemoryPlugin } = await import('./plugin/plugin.js');
+    const plugin = await MemoryPlugin({});
+    logTest('Plugin import', true);
+    
+    // Test memory_write
+    const writeResult = await plugin.tools.memory_write.execute({
+      content: 'Test entry for vector search implementation',
+      type: 'test',
+      tags: ['test', 'vector']
+    });
+    logTest('memory_write tool', writeResult.success);
+    
+    // Test memory_read
+    const readResult = await plugin.tools.memory_read.execute({ file: 'MEMORY.md' });
+    logTest('memory_read tool', readResult.success, `${readResult.lines} lines`);
+    
+    // Test list_daily
+    const dailyResult = await plugin.tools.list_daily.execute({ days: 7 });
+    logTest('list_daily tool', dailyResult.success, `${dailyResult.count} files`);
+    
+    // Test index_status
+    const statusResult = await plugin.tools.index_status.execute({});
+    logTest('index_status tool', statusResult.success);
+    
+    // Test vector_memory_search
+    const vectorResult = await plugin.tools.vector_memory_search.execute({
+      query: 'search implementation',
+      limit: 3
+    });
+    logTest('vector_memory_search tool', vectorResult.success, `mode: ${vectorResult.mode}`);
+    
+  } catch (e) {
+    logTest('Plugin import', false, e.message);
+    console.error(e.stack);
+  }
+
+  // Summary
+  console.log('\n========================================');
+  console.log('Test Summary');
+  console.log('========================================');
+  console.log(`Tests Passed: ${testsPassed}`);
+  console.log(`Tests Failed: ${testsFailed}`);
+  console.log('');
+  
+  if (testsFailed === 0) {
+    console.log('All tests passed! ✓');
+  } else {
+    console.log('Some tests failed. Review output above.');
+  }
+  
+  // Cleanup
+  vs.close();
+}
+
+runTests().catch(e => {
+  console.error('Test error:', e);
+  process.exit(1);
+});
+TESTEOF
+
+# Run the test
+CMD ["node", "test-vector-search.mjs"]

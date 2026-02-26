@@ -155,7 +155,8 @@ ${content}
         },
         async execute(args) {
           try {
-            const { query, file } = args;
+            const query = args.query;
+            const file = args.file || 'MEMORY.md';
             const filePath = path.join(MEMORY_DIR, file);
 
             if (!fs.existsSync(filePath)) {

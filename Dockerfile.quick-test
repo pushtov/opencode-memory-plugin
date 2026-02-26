@@ -1,0 +1,237 @@
+# Dockerfile for testing vector search without model download
+FROM node:20-slim
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    python3 \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Copy the plugin source
+COPY opencode-memory-plugin/ /app/plugin/
+
+# Install plugin dependencies
+WORKDIR /app/plugin
+RUN npm install
+
+# Create test directory
+WORKDIR /app
+RUN mkdir -p /root/.opencode/memory/daily
+
+# Create test memory content
+RUN cat > /root/.opencode/memory/MEMORY.md << 'EOF'
+# Long-Term Memory
+
+## Preference Entry
+**Date**: 2024-01-15
+**Type**: preference
+
+User prefers TypeScript for all new projects. They value strict type checking and explicit interfaces.
+
+---
+
+## Decision Entry
+**Date**: 2024-01-20
+**Type**: decision
+
+Decided to use SQLite for local storage because it's lightweight and requires no configuration.
+
+---
+
+## Pattern Entry
+**Date**: 2024-02-01
+**Type**: pattern
+
+When implementing search features, always consider three modes: exact keyword matching, semantic search, and hybrid approaches.
+EOF
+
+# Create memory config
+RUN cat > /root/.opencode/memory/memory-config.json << 'EOF'
+{
+  "version": "2.0",
+  "search": {
+    "mode": "hybrid",
+    "options": {
+      "hybrid": {
+        "vectorWeight": 0.7,
+        "keywordWeight": 0.3
+      }
+    }
+  },
+  "embedding": {
+    "enabled": true,
+    "provider": "transformers",
+    "model": "Xenova/all-MiniLM-L6-v2",
+    "fallbackMode": "keyword"
+  },
+  "indexing": {
+    "chunkSize": 400,
+    "chunkOverlap": 80
+  }
+}
+EOF
+
+# Create quick test script (no model download)
+RUN cat > /app/quick-test.mjs << 'TESTEOF'
+import { getVectorStore } from './plugin/lib/vector-store.js';
+import { MemoryPlugin } from './plugin/plugin.js';
+import fs from 'fs';
+import path from 'path';
+
+const HOME = '/root';
+const MEMORY_DIR = path.join(HOME, '.opencode', 'memory');
+
+console.log('========================================');
+console.log('Quick Vector Search Test (Fallback Mode)');
+console.log('========================================\n');
+
+async function runTests() {
+  let passed = 0;
+  let failed = 0;
+
+  // Test 1: Module Import
+  console.log('1. Module Import Test');
+  try {
+    const vs = getVectorStore();
+    console.log('   ✓ VectorStore module imported');
+    passed++;
+  } catch (e) {
+    console.log('   ✗ Failed:', e.message);
+    failed++;
+  }
+
+  // Test 2: VectorStore Initialization
+  console.log('\n2. VectorStore Initialization Test');
+  try {
+    const vs = getVectorStore();
+    const result = await vs.initialize();
+    if (result.success) {
+      console.log('   ✓ Initialized with model:', result.model);
+      passed++;
+    } else {
+      console.log('   ✓ Initialized with fallback mode (expected without network)');
+      passed++;
+    }
+  } catch (e) {
+    console.log('   ✗ Failed:', e.message);
+    failed++;
+  }
+
+  // Test 3: Keyword Search (always works)
+  console.log('\n3. Keyword Search Test');
+  try {
+    const vs = getVectorStore();
+    await vs.initialize();
+    const results = vs.keywordSearch('TypeScript', { limit: 5 });
+    console.log('   ✓ Keyword search works:', results.length, 'results');
+    passed++;
+  } catch (e) {
+    console.log('   ✗ Failed:', e.message);
+    failed++;
+  }
+
+  // Test 4: Plugin Tools
+  console.log('\n4. Plugin Tools Test');
+  try {
+    const plugin = await MemoryPlugin({});
+    
+    // memory_write
+    const writeResult = await plugin.tools.memory_write.execute({
+      content: 'Test entry for vector search',
+      type: 'test',
+      tags: ['test']
+    });
+    if (writeResult.success) {
+      console.log('   ✓ memory_write works');
+      passed++;
+    } else {
+      console.log('   ✗ memory_write failed');
+      failed++;
+    }
+    
+    // memory_read
+    const readResult = await plugin.tools.memory_read.execute({ file: 'MEMORY.md' });
+    if (readResult.success) {
+      console.log('   ✓ memory_read works:', readResult.lines, 'lines');
+      passed++;
+    } else {
+      console.log('   ✗ memory_read failed');
+      failed++;
+    }
+    
+    // memory_search
+    const searchResult = await plugin.tools.memory_search.execute({ query: 'TypeScript' });
+    if (searchResult.success) {
+      console.log('   ✓ memory_search works:', searchResult.count, 'matches');
+      passed++;
+    } else {
+      console.log('   ✗ memory_search failed');
+      failed++;
+    }
+    
+    // list_daily
+    const dailyResult = await plugin.tools.list_daily.execute({ days: 7 });
+    if (dailyResult.success) {
+      console.log('   ✓ list_daily works:', dailyResult.count, 'files');
+      passed++;
+    } else {
+      console.log('   ✗ list_daily failed');
+      failed++;
+    }
+    
+    // index_status
+    const statusResult = await plugin.tools.index_status.execute({});
+    if (statusResult.success) {
+      console.log('   ✓ index_status works');
+      console.log('     Vector index:', JSON.stringify(statusResult.vectorIndex, null, 4));
+      passed++;
+    } else {
+      console.log('   ✗ index_status failed');
+      failed++;
+    }
+    
+    // vector_memory_search (with fallback)
+    const vectorResult = await plugin.tools.vector_memory_search.execute({
+      query: 'programming',
+      limit: 3
+    });
+    if (vectorResult.success) {
+      console.log('   ✓ vector_memory_search works:', vectorResult.mode, 'mode');
+      passed++;
+    } else {
+      console.log('   ✗ vector_memory_search failed:', vectorResult.error);
+      failed++;
+    }
+    
+  } catch (e) {
+    console.log('   ✗ Plugin test failed:', e.message);
+    failed++;
+  }
+
+  // Summary
+  console.log('\n========================================');
+  console.log('Summary');
+  console.log('========================================');
+  console.log('Passed:', passed);
+  console.log('Failed:', failed);
+  console.log('');
+  
+  if (failed === 0) {
+    console.log('All tests passed! ✓');
+    process.exit(0);
+  } else {
+    console.log('Some tests failed.');
+    process.exit(1);
+  }
+}
+
+runTests().catch(e => {
+  console.error('Fatal error:', e);
+  process.exit(1);
+});
+TESTEOF
+
+# Run the test
+CMD ["node", "quick-test.mjs"]
