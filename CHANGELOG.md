@@ -1,22 +1,39 @@
-## [1.1.3] - 2026-02-26
+## [1.2.0] - 2026-02-26
 
-### Bug Fixes
-- **Fixed ES Module/CommonJS compatibility** - Renamed `bin/cli.js` to `bin/cli.cjs` for proper module resolution
-- **Fixed version mismatch** - Updated `index.js` version from 1.0.0 to 1.1.2
-- **Removed non-existent directory from package.json** - Removed `tools/` from files array
-- **Fixed package.json exports** - Set `main` to `plugin.js` for correct entry point
+### Major Features
+- **Real Vector Search Implementation** - Full semantic search using @huggingface/transformers embeddings
+- **sqlite-vec Integration** - Vector storage and similarity search using sqlite-vec
+- **Multiple Search Modes** - Support for vector, keyword, and hybrid search
+- **Full rebuild_index** - Complete implementation that indexes all memory files
+- **Enhanced index_status** - Shows vector index status, model, and dimensions
 
-### Documentation Updates
-- **Updated README** - Marked `vector_memory_search` and `rebuild_index` as placeholder implementations
-- **Updated README** - Corrected project structure to reflect actual files
-- **Removed misleading claims** - Changed "Semantic Search" feature to "Keyword Search" to reflect actual implementation
+### Added
+- `lib/vector-store.js` - VectorStore class for embeddings and search
+  - Uses all-MiniLM-L6-v2 model (384 dimensions) for embeddings
+  - Chunks text with configurable size and overlap
+  - Stores vectors in sqlite-vec for similarity search
+  - Supports vector, keyword, and hybrid search modes
+  - Graceful fallback when embedding model fails to load
+- `Dockerfile.test-vector` - Docker test for vector search
+- `scripts/test-vector-search.sh` - Comprehensive test script
 
-### Technical Notes
-- `vector_memory_search` currently uses keyword search fallback (full semantic search planned)
-- `rebuild_index` returns success without actual rebuild (full implementation planned)
-- CLI tool renamed from `bin/cli.js` to `bin/cli.cjs` for ES module compatibility
+### Changed
+- `vector_memory_search` - Now performs real semantic search with fallback to keyword
+- `rebuild_index` - Fully implemented to index all memory files
+- `index_status` - Returns vector index information
+- `plugin.js` - Updated to use VectorStore module
+- `package.json` - Added `lib/` to files array, version 1.2.0
+
+### Technical Details
+- Uses @huggingface/transformers for embedding generation
+- Uses sqlite-vec for vector operations
+- Uses better-sqlite3 for database
+- Embeddings normalized for cosine similarity
+- Chunks indexed with position tracking for result highlighting
 
 ---
+
+## [1.1.3] - 2026-02-26
 
 ## [1.1.2] - 2026-02-25
 

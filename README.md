@@ -25,14 +25,13 @@
   | `memory_write` | Write entries to long-term memory | ✅ Working |
   | `memory_read` | Read from memory files | ✅ Working |
   | `memory_search` | Keyword search across memory | ✅ Working |
-  | `vector_memory_search` | Semantic search with embeddings | ⚠️ Placeholder* |
+  | `vector_memory_search` | Semantic search with embeddings | ✅ Working |
   | `list_daily` | List available daily logs | ✅ Working |
   | `init_daily` | Initialize today's daily log | ✅ Working |
-  | `rebuild_index` | Rebuild vector index | ⚠️ Placeholder* |
+  | `rebuild_index` | Rebuild vector index | ✅ Working |
   | `index_status` | Check system status | ✅ Working |
 
-*Note: `vector_memory_search` and `rebuild_index` currently use keyword search fallback. Full vector search implementation is planned for a future release.
-## 📦 Installation
+*Note: `vector_memory_search` supports vector, keyword, and hybrid search modes. When embedding model is unavailable, it falls back to keyword search.
 
 ### One-Command Installation (Recommended)
 
@@ -159,7 +158,7 @@ list_daily days=7
 # Initialize today's log
 init_daily
 
-# Rebuild vector index (placeholder)
+# Rebuild vector index
 rebuild_index force=true
 ```
 
@@ -169,14 +168,15 @@ rebuild_index force=true
 - `memory_write` - Save memories to long-term storage
 - `memory_read` - Read memory files
 - `memory_search` - Keyword-based text search
+- `vector_memory_search` - Semantic search with embeddings (vector, keyword, hybrid modes)
 - `list_daily` - List daily log files
 - `init_daily` - Create today's daily log
-- `index_status` - Check system status
+- `rebuild_index` - Rebuild vector index with embeddings
+- `index_status` - Check system status including vector index info
 
-**Placeholder (Keyword Fallback):**
-- `vector_memory_search` - Currently uses keyword search; full semantic search planned
-- `rebuild_index` - Returns success without actual rebuild; full implementation planned
-### Using Automation Agents
+**Fallback Behavior:**
+- When embedding model fails to load, `vector_memory_search` falls back to keyword search
+- Model download requires network access on first use
 
 ```bash
 # Auto-save important information
@@ -295,46 +295,28 @@ MIT License - see [LICENSE](LICENSE) for details
 - Hugging Face for Transformers.js and the all-MiniLM-L6-v2 model
 - All contributors and users
 
-## 📊 Version
+**Current Version**: v1.2.0
 
-**Current Version**: v1.1.3
+### Latest Release: v1.2.0 (2026-02-26)
 
-### Latest Release: v1.1.3 (2026-02-26)
-
-**Bug Fixes**:
-- 🐛 Fixed ES Module/CommonJS compatibility (renamed cli.js to cli.cjs)
-- 🐛 Fixed version mismatch in index.js
-- 🐛 Removed non-existent tools/ directory from package.json
-- 📝 Updated documentation to clarify placeholder features
+**New Features**:
+- ✨ Real vector search with @huggingface/transformers embeddings
+- ✨ Vector, keyword, and hybrid search modes
+- ✨ sqlite-vec for vector storage and similarity search
+- ✨ Automatic fallback to keyword search when embedding model unavailable
+- ✨ Full `rebuild_index` implementation for indexing memory files
+- ✨ Enhanced `index_status` with vector index information
 
 ### Previous Releases
+
+**v1.1.3** (2026-02-26):
+- 🐛 Fixed ES Module/CommonJS compatibility
+- 🐛 Fixed version mismatch
+- 📝 Updated documentation
 
 **v1.1.2** (2026-02-25):
 - 🎉 Native OpenCode Plugin Integration
 - ✅ All 8 tools implemented
-- ✅ Zero configuration installation
-
-**v1.1.1** (2026-02-24):
-- 🐛 Fixed duplicate config declarations bug
-- 🐳 Added comprehensive Docker testing
-- 🧪 Added functional and integration tests
-
-**v1.1.0** (2026-02-24):
-- ✨ Semantic search with Transformers.js
-- ✨ Flexible configuration system (v2.0)
-- ✨ 5 embedding models, 4 search modes
-### Previous Releases
-
-**v1.1.1** (2026-02-24):
-- 🐛 Fixed duplicate config declarations bug
-- 🐳 Added comprehensive Docker testing
-- 🧪 Added functional and integration tests
-
-**v1.1.0** (2026-02-24):
-- ✨ True semantic search with Transformers.js
-- ✨ Flexible configuration system (v2.0)
-- ✨ 5 embedding models available
-- ✨ 4 search modes (hybrid, vector, bm25, hash)
 
 For detailed changes, see [CHANGELOG.md](./CHANGELOG.md).
 
