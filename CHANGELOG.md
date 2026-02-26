@@ -1,6 +1,22 @@
-# Changelog
+## [1.1.3] - 2026-02-26
 
-All notable changes to OpenCode Memory Plugin will be documented in this file.
+### Bug Fixes
+- **Fixed ES Module/CommonJS compatibility** - Renamed `bin/cli.js` to `bin/cli.cjs` for proper module resolution
+- **Fixed version mismatch** - Updated `index.js` version from 1.0.0 to 1.1.2
+- **Removed non-existent directory from package.json** - Removed `tools/` from files array
+- **Fixed package.json exports** - Set `main` to `plugin.js` for correct entry point
+
+### Documentation Updates
+- **Updated README** - Marked `vector_memory_search` and `rebuild_index` as placeholder implementations
+- **Updated README** - Corrected project structure to reflect actual files
+- **Removed misleading claims** - Changed "Semantic Search" feature to "Keyword Search" to reflect actual implementation
+
+### Technical Notes
+- `vector_memory_search` currently uses keyword search fallback (full semantic search planned)
+- `rebuild_index` returns success without actual rebuild (full implementation planned)
+- CLI tool renamed from `bin/cli.js` to `bin/cli.cjs` for ES module compatibility
+
+---
 
 ## [1.1.2] - 2026-02-25
 

@@ -16,11 +16,7 @@
 - ✅ **8 Memory Tools** - All tools available immediately after installation
 - ✅ **Zero Configuration** - Just install and use, no setup required
 - ✅ **OpenClaw-Style Memory** - Complete 9 core memory files (SOUL, AGENTS, USER, IDENTITY, TOOLS, MEMORY, HEARTBEAT, BOOT, BOOTSTRAP)
-- ✅ **Semantic Search** - Vector embeddings using @huggingface/transformers (all-MiniLM-L6-v2)
-- ✅ **Keyword Search** - Fast BM25-based search
-- ✅ **Daily Memory Logs** - Running context with automatic consolidation
-- ✅ **Long-Term Memory** - Persistent knowledge across sessions and projects
-- ✅ **Flexible Configuration** - 5 embedding models, 4 search modes (v2.0)
+- ✅ **Keyword Search** - Fast text-based search across all memory files
 
   ### Available Tools (8)
 
@@ -29,11 +25,13 @@
   | `memory_write` | Write entries to long-term memory | ✅ Working |
   | `memory_read` | Read from memory files | ✅ Working |
   | `memory_search` | Keyword search across memory | ✅ Working |
-  | `vector_memory_search` | Semantic search with embeddings | ✅ Working |
+  | `vector_memory_search` | Semantic search with embeddings | ⚠️ Placeholder* |
   | `list_daily` | List available daily logs | ✅ Working |
   | `init_daily` | Initialize today's daily log | ✅ Working |
-  | `rebuild_index` | Rebuild vector index | ✅ Working |
-| `index_status` | Check system status | ✅ Working |
+  | `rebuild_index` | Rebuild vector index | ⚠️ Placeholder* |
+  | `index_status` | Check system status | ✅ Working |
+
+*Note: `vector_memory_search` and `rebuild_index` currently use keyword search fallback. Full vector search implementation is planned for a future release.
 ## 📦 Installation
 
 ### One-Command Installation (Recommended)
@@ -161,13 +159,23 @@ list_daily days=7
 # Initialize today's log
 init_daily
 
-# Check vector index status
-index_status
-
-# Rebuild vector index
+# Rebuild vector index (placeholder)
 rebuild_index force=true
 ```
 
+### ⚠️ Feature Status
+
+**Fully Implemented:**
+- `memory_write` - Save memories to long-term storage
+- `memory_read` - Read memory files
+- `memory_search` - Keyword-based text search
+- `list_daily` - List daily log files
+- `init_daily` - Create today's daily log
+- `index_status` - Check system status
+
+**Placeholder (Keyword Fallback):**
+- `vector_memory_search` - Currently uses keyword search; full semantic search planned
+- `rebuild_index` - Returns success without actual rebuild; full implementation planned
 ### Using Automation Agents
 
 ```bash
@@ -199,7 +207,6 @@ opencode-memory status
 ```
 
 ## 📂 Project Structure
-## 📂 Project Structure
 
 ```
 opencode-memory-plugin/
@@ -214,17 +221,20 @@ opencode-memory-plugin/
 │   ├── BOOT.md            # Startup checklist
 │   ├── BOOTSTRAP.md       # One-time ritual
 │   └── daily/             # Daily logs
-├── tools/               # Custom OpenCode tools
-│   ├── memory.ts            # Basic memory tools
-│   ├── config.ts            # Configuration management ⭐ NEW
-│   ├── search-modes.ts      # Search implementations ⭐ NEW
-│   └── vector-memory.ts     # Vector search tools (with Transformers.js)
 ├── agents/              # Custom OpenCode agents
 │   ├── memory-automation.md    # Auto-save agent
 │   └── memory-consolidate.md   # Auto-consolidate agent
 ├── scripts/             # Utility scripts
-│   └── uninstall.sh      # Uninstall script ⭐ NEW
-└── package.json           # NPM package configuration
+│   ├── init.sh             # Installation script
+│   ├── docker-init.sh     # Docker setup
+│   ├── uninstall.sh        # Uninstall script
+│   └── test-memory-functions.sh # Test script
+├── bin/                 # CLI and install scripts
+│   ├── cli.cjs            # Command-line interface
+│   └── install.cjs         # NPM install hook
+├── plugin.js            # OpenCode plugin entry
+├── index.js             # Plugin metadata
+└── package.json         # NPM package config
 ```
 
 ## 🔬 Under the Hood
@@ -287,28 +297,32 @@ MIT License - see [LICENSE](LICENSE) for details
 
 ## 📊 Version
 
-**Current Version**: v1.1.2
+**Current Version**: v1.1.3
 
-### Latest Release: v1.1.2 (2026-02-25)
+### Latest Release: v1.1.3 (2026-02-26)
 
-**Major Features**:
-- 🎉 **Native OpenCode Plugin Integration** - Using @opencode-ai/plugin API
-- ✅ **All 8 Tools Working** - Fully implemented and tested
-- ✅ **Zero Configuration** - Install and use immediately
-- 🚀 **Production Ready** - 100% test pass rate
+**Bug Fixes**:
+- 🐛 Fixed ES Module/CommonJS compatibility (renamed cli.js to cli.cjs)
+- 🐛 Fixed version mismatch in index.js
+- 🐛 Removed non-existent tools/ directory from package.json
+- 📝 Updated documentation to clarify placeholder features
 
-**Technical Improvements**:
-- Implemented all 8 memory tools with proper tool() definitions
-- Added ES module support (type: module)
-- Created CLI tool for command-line access
-- Comprehensive Docker testing
-- Complete documentation
+### Previous Releases
 
-**Installation**:
-```bash
-npm install -g @csuwl/opencode-memory-plugin@1.1.2
-```
+**v1.1.2** (2026-02-25):
+- 🎉 Native OpenCode Plugin Integration
+- ✅ All 8 tools implemented
+- ✅ Zero configuration installation
 
+**v1.1.1** (2026-02-24):
+- 🐛 Fixed duplicate config declarations bug
+- 🐳 Added comprehensive Docker testing
+- 🧪 Added functional and integration tests
+
+**v1.1.0** (2026-02-24):
+- ✨ Semantic search with Transformers.js
+- ✨ Flexible configuration system (v2.0)
+- ✨ 5 embedding models, 4 search modes
 ### Previous Releases
 
 **v1.1.1** (2026-02-24):
