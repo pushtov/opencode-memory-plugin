@@ -278,33 +278,35 @@ export class VectorStore {
     // Generate embeddings for all chunks
     const embeddings = await this.generateEmbeddings(chunks.map(c => c.content));
 
-    // Begin transaction
-    const insertDoc = this.db.prepare(`
-      INSERT INTO documents (content, source_file, line_number, chunk_index)
-      VALUES (?, ?, ?, ?)
-    `);
-    
+    // Prepare statements
     const insertVec = this.db.prepare(`
-      INSERT INTO vec_embeddings (rowid, embedding)
-      VALUES (?, ?)
+      INSERT INTO vec_embeddings (embedding)
+      VALUES (?)
     `);
 
+    const insertDoc = this.db.prepare(`
+      INSERT INTO documents (id, content, source_file, line_number, chunk_index)
+      VALUES (?, ?, ?, ?, ?)
+    `);
+
+    // Begin transaction
     this.db.transaction(() => {
       for (let i = 0; i < chunks.length; i++) {
         const chunk = chunks[i];
         const embedding = embeddings[i];
         
-        // Insert document
-        const result = insertDoc.run(
+        // Insert vector first (auto-generates rowid)
+        const vectorBlob = new Float32Array(embedding);
+        const vecResult = insertVec.run(vectorBlob);
+        
+        // Insert document with vector rowid as id
+        insertDoc.run(
+          Number(vecResult.lastInsertRowid),
           chunk.content,
           sourceFile,
           chunk.startLine,
           chunk.index
         );
-        
-        // Insert vector
-        const vectorBlob = new Float32Array(embedding);
-        insertVec.run(result.lastInsertRowid, vectorBlob);
       }
     })();
 
@@ -386,7 +388,8 @@ export class VectorStore {
       }
     }
 
-    const { 
+      limit = 10, 
+      threshold = 0.8,
       limit = 10, 
       threshold = 0.5,
       sourceFile = null 

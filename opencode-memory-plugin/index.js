@@ -34,7 +34,11 @@ export const pluginInfo = {
     'list_daily',
     'init_daily',
     'rebuild_index',
-    'index_status'
+    'index_status',
+    'update_index',
+    'configure_index',
+    'save_session',
+    'list_sessions'
   ],
   
   /**

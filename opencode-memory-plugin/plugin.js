@@ -3,12 +3,14 @@ import fs from 'fs';
 import path from 'path';
 import { getVectorStore } from './lib/vector-store.js';
 import { BM25Index, createBM25Index } from './lib/bm25.js';
+import { getIndexManager } from './lib/index-manager.js';
 
 const HOME = process.env.HOME || process.env.USERPROFILE;
 const MEMORY_DIR = path.join(HOME, '.opencode', 'memory');
 const MEMORY_FILE = path.join(MEMORY_DIR, 'MEMORY.md');
 const CONFIG_FILE = path.join(MEMORY_DIR, 'memory-config.json');
 const DAILY_DIR = path.join(MEMORY_DIR, 'daily');
+const SESSIONS_DIR = path.join(MEMORY_DIR, 'sessions');
 
 /**
  * Read memory configuration
@@ -23,7 +25,7 @@ function getConfig() {
 }
 
 /**
- * Get all memory files to index
+ * Get all memory files to index (unlimited - no time restriction)
  */
 function getMemoryFiles() {
   const files = [];
@@ -37,13 +39,12 @@ function getMemoryFiles() {
     }
   }
   
-  // Daily logs
+  // Daily logs - ALL files, no limit
   if (fs.existsSync(DAILY_DIR)) {
     const dailyFiles = fs.readdirSync(DAILY_DIR)
       .filter(f => f.endsWith('.md'))
       .sort()
-      .reverse()
-      .slice(0, 30); // Last 30 days
+      .reverse(); // Most recent first
     
     for (const file of dailyFiles) {
       files.push({ 
@@ -53,7 +54,60 @@ function getMemoryFiles() {
     }
   }
   
+  // Session records - ALL files, no limit
+  if (fs.existsSync(SESSIONS_DIR)) {
+    const sessionFiles = fs.readdirSync(SESSIONS_DIR)
+      .filter(f => f.endsWith('.md'))
+      .sort()
+      .reverse();
+    
+    for (const file of sessionFiles) {
+      files.push({ 
+        path: path.join(SESSIONS_DIR, file), 
+        name: `sessions/${file}` 
+      });
+    }
+  }
+  
   return files;
+}
+
+/**
+ * Generate a slug from content
+ * @param {string} content - Content to extract keywords from
+ * @returns {string} URL-friendly slug
+ */
+function generateSlug(content) {
+  // Extract key phrases from content
+  const lines = content.split('\n').filter(l => l.trim());
+  
+  // Get first meaningful line (title or first paragraph)
+  let title = '';
+  for (const line of lines) {
+    const trimmed = line.trim();
+    // Skip markdown headings and empty lines
+    if (trimmed && !trimmed.startsWith('#') && !trimmed.startsWith('*') && trimmed.length > 5) {
+      title = trimmed;
+      break;
+    }
+    // Use heading if no paragraph found
+    if (trimmed.startsWith('#') && !title) {
+      title = trimmed.replace(/^#+\s*/, '');
+    }
+  }
+  
+  if (!title) {
+    title = 'session';
+  }
+  
+  // Generate slug
+  return title
+    .toLowerCase()
+    .replace(/[^\w\s-]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .substring(0, 50)
+    .replace(/^-|-$/g, '');
 }
 
 /**
@@ -94,6 +148,14 @@ ${content}
 
             // Append to memory file
             fs.appendFileSync(MEMORY_FILE, entry, 'utf-8');
+
+            // Queue index update
+            try {
+              const indexManager = getIndexManager();
+              indexManager.queueUpdate(MEMORY_FILE, 'MEMORY.md');
+            } catch (e) {
+              // Ignore indexing errors
+            }
 
             return {
               success: true,
@@ -381,6 +443,14 @@ ${content}
 
             fs.writeFileSync(dailyFile, content, 'utf-8');
 
+            // Queue index update
+            try {
+              const indexManager = getIndexManager();
+              indexManager.queueUpdate(dailyFile, `daily/${today}.md`);
+            } catch (e) {
+              // Ignore indexing errors
+            }
+
             return {
               success: true,
               message: "Daily log created",
@@ -549,6 +619,167 @@ ${content}
                 lastIndexed: vectorStatus.lastIndexed || null,
                 dbPath: vectorStatus.dbPath || null
               }
+            };
+          } catch (e) {
+            return {
+              success: false,
+              error: e.message
+            };
+          }
+        }
+      })
+,
+
+      update_index: tool({
+        description: "Incrementally update the vector search index. Only processes files that have changed since last indexing.",
+        args: {
+          force: tool.schema.boolean().optional().default(false).describe("Force rebuild of all files, not just changed ones")
+        },
+        async execute(args) {
+          try {
+            const { force } = args;
+            const indexManager = getIndexManager();
+            const result = await indexManager.rebuildIndex(force);
+            return {
+              success: result.success,
+              ...result
+            };
+          } catch (e) {
+            return {
+              success: false,
+              error: e.message
+            };
+          }
+        }
+      }),
+
+      configure_index: tool({
+        description: "Configure index behavior settings like auto-update, debounce delay, and batch size.",
+        args: {
+          autoUpdate: tool.schema.boolean().optional().describe("Enable/disable automatic index updates on file changes"),
+          debounceDelay: tool.schema.number().optional().describe("Delay in milliseconds before processing queued updates (default: 1000)"),
+          batchSize: tool.schema.number().optional().describe("Number of files to process in each batch (default: 10)")
+        },
+        async execute(args) {
+          try {
+            const indexManager = getIndexManager();
+            const config = indexManager.configure(args);
+            return {
+              success: true,
+              message: "Index configuration updated",
+              config: config.indexing
+            };
+          } catch (e) {
+            return {
+              success: false,
+              error: e.message
+            };
+          }
+        }
+      }),
+
+      save_session: tool({
+        description: "Save a session record to preserve conversation context and important decisions.",
+        args: {
+          title: tool.schema.string().optional().describe("Title for the session (auto-generated from content if not provided)"),
+          content: tool.schema.string().describe("The session content to save"),
+          tags: tool.schema.array(tool.schema.string()).optional().default([]).describe("Tags for categorizing the session")
+        },
+        async execute(args) {
+          try {
+            const { title, content, tags } = args;
+            const timestamp = new Date().toISOString();
+            const date = timestamp.split('T')[0];
+            const time = timestamp.split('T')[1].split('.')[0].replace(/:/g, '-');
+
+            // Create sessions directory if needed
+            if (!fs.existsSync(SESSIONS_DIR)) {
+              fs.mkdirSync(SESSIONS_DIR, { recursive: true });
+            }
+
+            // Generate filename
+            const slug = generateSlug(content);
+            const sessionTitle = title || slug;
+            const fileName = `${date}_${time}_${slug}.md`;
+            const sessionFile = path.join(SESSIONS_DIR, fileName);
+
+            const sessionContent = `# Session: ${sessionTitle}
+
+**Date**: ${timestamp}
+**Tags**: ${tags.join(', ') || 'none'}
+
+## Summary
+
+${content}
+
+---
+`;
+
+            fs.writeFileSync(sessionFile, sessionContent, 'utf-8');
+
+            // Queue index update
+            try {
+              const indexManager = getIndexManager();
+              indexManager.queueUpdate(sessionFile, `sessions/${fileName}`);
+            } catch (e) {
+              // Ignore indexing errors
+            }
+
+            return {
+              success: true,
+              message: "Session saved",
+              file: sessionFile,
+              title: sessionTitle,
+              tags
+            };
+          } catch (e) {
+            return {
+              success: false,
+              error: e.message
+            };
+          }
+        }
+      }),
+
+      list_sessions: tool({
+        description: "List available session records.",
+        args: {
+          limit: tool.schema.number().optional().default(20).describe("Maximum number of sessions to list")
+        },
+        async execute(args) {
+          try {
+            const { limit } = args;
+
+            if (!fs.existsSync(SESSIONS_DIR)) {
+              return {
+                success: true,
+                sessions: [],
+                count: 0,
+                message: "Sessions directory not found"
+              };
+            }
+
+            const files = fs.readdirSync(SESSIONS_DIR)
+              .filter(f => f.endsWith('.md'))
+              .sort()
+              .reverse()
+              .slice(0, limit);
+
+            const sessions = files.map(file => {
+              const filePath = path.join(SESSIONS_DIR, file);
+              const stats = fs.statSync(filePath);
+              return {
+                name: file,
+                size: stats.size,
+                modified: stats.mtime,
+                path: filePath
+              };
+            });
+
+            return {
+              success: true,
+              sessions,
+              count: sessions.length
             };
           } catch (e) {
             return {
