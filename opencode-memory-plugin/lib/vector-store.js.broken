@@ -388,7 +388,8 @@ export class VectorStore {
       }
     }
 
-    const { 
+      limit = 10, 
+      threshold = 0.8,
       limit = 10, 
       threshold = 0.5,
       sourceFile = null 
