@@ -8,7 +8,7 @@
  * - BM25 for fallback keyword search
  */
 
-import { pipeline, cos_sim } from '@huggingface/transformers';
+import { pipeline, cos_sim, env } from '@huggingface/transformers';
 import Database from 'better-sqlite3';
 import { load as loadVec } from 'sqlite-vec';
 import fs from 'fs';
@@ -181,6 +181,7 @@ export class VectorStore {
     const mirrorUrl = config.embedding?.mirrorUrl || process.env.HF_HUB_URL || null;
     if (mirrorUrl) {
       console.log(`Using Hugging Face mirror: ${mirrorUrl}`);
+      env.remoteHost = mirrorUrl;
     }
 
     // Create feature extraction pipeline
@@ -191,8 +192,7 @@ export class VectorStore {
           if (progress.status === 'downloading') {
             console.log(`Loading model: ${progress.file} (${Math.round(progress.progress || 0)}%)`);
           }
-        },
-        ...(mirrorUrl && { endpoint: mirrorUrl })
+        }
       });
     } catch (error) {
       console.error('Failed to load embedding model:', error.message);
