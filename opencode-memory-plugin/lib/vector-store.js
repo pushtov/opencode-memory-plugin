@@ -180,8 +180,14 @@ export class VectorStore {
     // Set HF_HUB_URL environment variable or config.embedding.mirrorUrl
     const mirrorUrl = config.embedding?.mirrorUrl || process.env.HF_HUB_URL || null;
     if (mirrorUrl) {
-      console.log(`Using Hugging Face mirror: ${mirrorUrl}`);
-      env.remoteHost = mirrorUrl;
+      // Validate URL format
+      try {
+        new URL(mirrorUrl);
+        console.log(`Using Hugging Face mirror: ${mirrorUrl}`);
+        env.remoteHost = mirrorUrl;
+      } catch (e) {
+        console.warn('Invalid mirror URL, using default:', mirrorUrl);
+      }
     }
 
     // Create feature extraction pipeline

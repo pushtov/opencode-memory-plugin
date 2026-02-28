@@ -182,7 +182,14 @@ ${content}
         async execute(args) {
           try {
             const file = args.file || 'MEMORY.md';
-            const filePath = path.join(MEMORY_DIR, file);
+            
+            // Security: Validate path to prevent directory traversal
+            const resolvedPath = path.resolve(MEMORY_DIR, file);
+            if (!resolvedPath.startsWith(path.resolve(MEMORY_DIR))) {
+              return { success: false, error: "Invalid file path: directory traversal not allowed" };
+            }
+            
+            const filePath = resolvedPath;
 
             if (!fs.existsSync(filePath)) {
               return {
@@ -220,7 +227,14 @@ ${content}
           try {
             const query = args.query;
             const file = args.file || 'MEMORY.md';
-            const filePath = path.join(MEMORY_DIR, file);
+            
+            // Security: Validate path to prevent directory traversal
+            const resolvedPath = path.resolve(MEMORY_DIR, file);
+            if (!resolvedPath.startsWith(path.resolve(MEMORY_DIR))) {
+              return { success: false, error: "Invalid file path: directory traversal not allowed" };
+            }
+            
+            const filePath = resolvedPath;
 
             if (!fs.existsSync(filePath)) {
               return {
@@ -662,6 +676,14 @@ ${content}
         },
         async execute(args) {
           try {
+            // Input validation
+            if (args.debounceDelay !== undefined && args.debounceDelay < 0) {
+              return { success: false, error: "debounceDelay must be a positive number" };
+            }
+            if (args.batchSize !== undefined && args.batchSize < 1) {
+              return { success: false, error: "batchSize must be at least 1" };
+            }
+            
             const indexManager = getIndexManager();
             const config = indexManager.configure(args);
             return {

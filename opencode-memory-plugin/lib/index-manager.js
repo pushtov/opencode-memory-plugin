@@ -223,11 +223,14 @@ export class IndexManager {
    * Process the update queue
    */
   async processQueue() {
-    if (this.isProcessing || this.updateQueue.length === 0) {
+    // Atomic check-and-set to prevent race condition
+    if (this.isProcessing) return;
+    this.isProcessing = true;
+    
+    if (this.updateQueue.length === 0) {
+      this.isProcessing = false;
       return;
     }
-    
-    this.isProcessing = true;
     const config = this.getConfig();
     const batchSize = config.indexing?.batchSize || 10;
     
@@ -429,6 +432,18 @@ export class IndexManager {
     
     return config;
   }
+
+  /**
+   * Cleanup resources (prevent memory leaks)
+   */
+  destroy() {
+    if (this.debounceTimer) {
+      clearTimeout(this.debounceTimer);
+      this.debounceTimer = null;
+    }
+    this.updateQueue = [];
+    this.isProcessing = false;
+  }
 }
 
 // Singleton instance
@@ -442,6 +457,16 @@ export function getIndexManager() {
     indexManagerInstance = new IndexManager();
   }
   return indexManagerInstance;
+}
+
+/**
+ * Reset singleton instance (for testing)
+ */
+export function resetIndexManager() {
+  if (indexManagerInstance) {
+    indexManagerInstance.destroy();
+    indexManagerInstance = null;
+  }
 }
 
 export default IndexManager;
