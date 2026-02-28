@@ -284,6 +284,14 @@ ${content}
         async execute(args) {
           const { query, mode, limit, threshold } = args;
           
+          // Input validation
+          if (threshold !== undefined && (threshold < 0 || threshold > 1)) {
+            return { success: false, error: "threshold must be between 0 and 1" };
+          }
+          if (limit !== undefined && limit < 1) {
+            return { success: false, error: "limit must be at least 1" };
+          }
+          
           try {
             const config = getConfig();
 
