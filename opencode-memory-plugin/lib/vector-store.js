@@ -175,6 +175,13 @@ export class VectorStore {
     const config = this.getConfig();
     const cacheDir = config.embedding?.cache?.directory || 
       path.join(HOME, '.cache', 'huggingface');
+    
+    // Support for Hugging Face mirror (useful in China)
+    // Set HF_HUB_URL environment variable or config.embedding.mirrorUrl
+    const mirrorUrl = config.embedding?.mirrorUrl || process.env.HF_HUB_URL || null;
+    if (mirrorUrl) {
+      console.log(`Using Hugging Face mirror: ${mirrorUrl}`);
+    }
 
     // Create feature extraction pipeline
     try {
@@ -184,7 +191,8 @@ export class VectorStore {
           if (progress.status === 'downloading') {
             console.log(`Loading model: ${progress.file} (${Math.round(progress.progress || 0)}%)`);
           }
-        }
+        },
+        ...(mirrorUrl && { endpoint: mirrorUrl })
       });
     } catch (error) {
       console.error('Failed to load embedding model:', error.message);
