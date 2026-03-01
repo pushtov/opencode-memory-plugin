@@ -1,6 +1,6 @@
 {
   "name": "@csuwl/opencode-memory-plugin",
-  "version": "1.3.1-pre.4",
+  "version": "1.3.1-pre.5",
   "description": "OpenClaw-style memory system for OpenCode with full automation and real vector search",
   "license": "MIT",
   "type": "module",

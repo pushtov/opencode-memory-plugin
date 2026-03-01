@@ -115,7 +115,7 @@ function generateSlug(content) {
  * Provides persistent memory functionality for OpenCode
  */
 export const MemoryPlugin = async (ctx) => {
-  return JSON.stringify({
+  return {
     tool: {
       memory_write: tool({
         description: "Write an entry to long-term memory. Use this to save important information that should persist across sessions.",
@@ -157,15 +157,17 @@ ${content}
               // Ignore indexing errors
             }
 
-            return JSON.stringify({              success: true,
+            return JSON.stringify({ success: true, 
               message: "Entry written to memory",
               file: MEMORY_FILE,
               type,
               tags,
-              length: content.length});
+              length: content.length
+             });
           } catch (e) {
-            return JSON.stringify({              success: false,
-              error: e.message});
+            return JSON.stringify({ success: false, 
+              error: e.message
+             });
           }
         }
       }),
@@ -182,7 +184,7 @@ ${content}
             // Security: Validate path to prevent directory traversal
             const resolvedPath = path.resolve(MEMORY_DIR, file);
             if (!resolvedPath.startsWith(path.resolve(MEMORY_DIR))) {
-              return JSON.stringify({ success: false, error: "Invalid file path: directory traversal not allowed" });
+              return JSON.stringify({ success: false,  error: "Invalid file path: directory traversal not allowed"  });
             }
             
             const filePath = resolvedPath;
@@ -197,14 +199,16 @@ ${content}
             const content = fs.readFileSync(filePath, 'utf-8');
             const lines = content.split('\n').length;
 
-            return JSON.stringify({              success: true,
+            return JSON.stringify({ success: true, 
               file,
               content,
               lines,
-              size: Buffer.byteLength(content, 'utf-8')});
+              size: Buffer.byteLength(content, 'utf-8')
+             });
           } catch (e) {
-            return JSON.stringify({              success: false,
-              error: e.message});
+            return JSON.stringify({ success: false, 
+              error: e.message
+             });
           }
         }
       }),
@@ -223,7 +227,7 @@ ${content}
             // Security: Validate path to prevent directory traversal
             const resolvedPath = path.resolve(MEMORY_DIR, file);
             if (!resolvedPath.startsWith(path.resolve(MEMORY_DIR))) {
-              return JSON.stringify({ success: false, error: "Invalid file path: directory traversal not allowed" });
+              return JSON.stringify({ success: false,  error: "Invalid file path: directory traversal not allowed"  });
             }
             
             const filePath = resolvedPath;
@@ -249,14 +253,16 @@ ${content}
               }
             });
 
-            return JSON.stringify({              success: true,
+            return JSON.stringify({ success: true, 
               query,
               file,
               matches,
-              count: matches.length});
+              count: matches.length
+             });
           } catch (e) {
-            return JSON.stringify({              success: false,
-              error: e.message});
+            return JSON.stringify({ success: false, 
+              error: e.message
+             });
           }
         }
       }),
@@ -274,25 +280,27 @@ ${content}
           
           // Input validation
           if (threshold !== undefined && (threshold < 0 || threshold > 1)) {
-            return JSON.stringify({ success: false, error: "threshold must be between 0 and 1" });
+            return JSON.stringify({ success: false,  error: "threshold must be between 0 and 1"  });
           }
           if (limit !== undefined && limit < 1) {
-            return JSON.stringify({ success: false, error: "limit must be at least 1" });
+            return JSON.stringify({ success: false,  error: "limit must be at least 1"  });
           }
           
           try {
             const config = getConfig();
 
             if (!config) {
-              return JSON.stringify({                success: false,
-                error: "Memory configuration not found. Please run the initialization script."});
+              return JSON.stringify({ success: false, 
+                error: "Memory configuration not found. Please run the initialization script."
+               });
             }
 
             // Check if embedding is enabled
             if (!config.embedding?.enabled && config.embedding?.enabled !== undefined) {
-              return JSON.stringify({                success: false,
+              return JSON.stringify({ success: false, 
                 error: "Embedding is disabled in configuration",
-                suggestion: "Try using memory_search for keyword search instead"});
+                suggestion: "Try using memory_search for keyword search instead"
+               });
             }
 
             // Get vector store instance
@@ -374,10 +382,11 @@ ${content}
             const { days } = args;
 
             if (!fs.existsSync(DAILY_DIR)) {
-              return JSON.stringify({                success: true,
+              return JSON.stringify({ success: true, 
                 files: [],
                 count: 0,
-                message: "Daily directory not found"});
+                message: "Daily directory not found"
+               });
             }
 
             const allFiles = fs.readdirSync(DAILY_DIR)
@@ -389,17 +398,21 @@ ${content}
             const files = allFiles.map(file => {
               const filePath = path.join(DAILY_DIR, file);
               const stats = fs.statSync(filePath);
-              return JSON.stringify({                name: file,
+              return {
+                name: file,
                 size: stats.size,
-                modified: stats.mtime});
+                modified: stats.mtime
+              };
             });
 
-            return JSON.stringify({              success: true,
+            return JSON.stringify({ success: true, 
               files,
-              count: files.length});
+              count: files.length
+             });
           } catch (e) {
-            return JSON.stringify({              success: false,
-              error: e.message});
+            return JSON.stringify({ success: false, 
+              error: e.message
+             });
           }
         }
       }),
@@ -413,10 +426,11 @@ ${content}
             const dailyFile = path.join(DAILY_DIR, `${today}.md`);
 
             if (fs.existsSync(dailyFile)) {
-              return JSON.stringify({                success: true,
+              return JSON.stringify({ success: true, 
                 message: "Daily log already exists",
                 file: dailyFile,
-                date: today});
+                date: today
+               });
             }
 
             // Create daily directory if needed
@@ -447,13 +461,15 @@ ${content}
               // Ignore indexing errors
             }
 
-            return JSON.stringify({              success: true,
+            return JSON.stringify({ success: true, 
               message: "Daily log created",
               file: dailyFile,
-              date: today});
+              date: today
+             });
           } catch (e) {
-            return JSON.stringify({              success: false,
-              error: e.message});
+            return JSON.stringify({ success: false, 
+              error: e.message
+             });
           }
         }
       }),
@@ -469,8 +485,9 @@ ${content}
             const config = getConfig();
 
             if (!config) {
-              return JSON.stringify({                success: false,
-                error: "Memory configuration not found. Please run the initialization script."});
+              return JSON.stringify({ success: false, 
+                error: "Memory configuration not found. Please run the initialization script."
+               });
             }
 
             // Get vector store instance
@@ -498,10 +515,11 @@ ${content}
             const files = getMemoryFiles();
             
             if (files.length === 0) {
-              return JSON.stringify({                success: true,
+              return JSON.stringify({ success: true, 
                 message: "No memory files found to index",
                 indexedFiles: 0,
-                totalChunks: 0});
+                totalChunks: 0
+               });
             }
 
             // Index each file
@@ -526,7 +544,7 @@ ${content}
             // Get final status
             const status = vectorStore.getStatus();
 
-            return JSON.stringify({              success: true,
+            return JSON.stringify({ success: true, 
               message: "Index rebuild completed",
               force,
               model: status.model,
@@ -534,10 +552,12 @@ ${content}
               indexedFiles: files.length,
               totalChunks,
               results,
-              lastIndexed: status.lastIndexed});
+              lastIndexed: status.lastIndexed
+             });
           } catch (e) {
-            return JSON.stringify({              success: false,
-              error: e.message});
+            return JSON.stringify({ success: false, 
+              error: e.message
+             });
           }
         }
       }),
@@ -550,8 +570,9 @@ ${content}
             const config = getConfig();
 
             if (!config) {
-              return JSON.stringify({                success: false,
-                error: "Configuration not found"});
+              return JSON.stringify({ success: false, 
+                error: "Configuration not found"
+               });
             }
 
             // Check memory files
@@ -603,8 +624,9 @@ ${content}
               }
             };
           } catch (e) {
-            return JSON.stringify({              success: false,
-              error: e.message});
+            return JSON.stringify({ success: false, 
+              error: e.message
+             });
           }
         }
       })
@@ -620,11 +642,14 @@ ${content}
             const { force } = args;
             const indexManager = getIndexManager();
             const result = await indexManager.rebuildIndex(force);
-            return JSON.stringify({              success: result.success,
-              ...result});
+            return {
+              success: result.success,
+              ...result
+            };
           } catch (e) {
-            return JSON.stringify({              success: false,
-              error: e.message});
+            return JSON.stringify({ success: false, 
+              error: e.message
+             });
           }
         }
       }),
@@ -640,20 +665,22 @@ ${content}
           try {
             // Input validation
             if (args.debounceDelay !== undefined && args.debounceDelay < 0) {
-              return JSON.stringify({ success: false, error: "debounceDelay must be a positive number" });
+              return JSON.stringify({ success: false,  error: "debounceDelay must be a positive number"  });
             }
             if (args.batchSize !== undefined && args.batchSize < 1) {
-              return JSON.stringify({ success: false, error: "batchSize must be at least 1" });
+              return JSON.stringify({ success: false,  error: "batchSize must be at least 1"  });
             }
             
             const indexManager = getIndexManager();
             const config = indexManager.configure(args);
-            return JSON.stringify({              success: true,
+            return JSON.stringify({ success: true, 
               message: "Index configuration updated",
-              config: config.indexing});
+              config: config.indexing
+             });
           } catch (e) {
-            return JSON.stringify({              success: false,
-              error: e.message});
+            return JSON.stringify({ success: false, 
+              error: e.message
+             });
           }
         }
       }),
@@ -705,14 +732,16 @@ ${content}
               // Ignore indexing errors
             }
 
-            return JSON.stringify({              success: true,
+            return JSON.stringify({ success: true, 
               message: "Session saved",
               file: sessionFile,
               title: sessionTitle,
-              tags});
+              tags
+             });
           } catch (e) {
-            return JSON.stringify({              success: false,
-              error: e.message});
+            return JSON.stringify({ success: false, 
+              error: e.message
+             });
           }
         }
       }),
@@ -727,10 +756,11 @@ ${content}
             const { limit } = args;
 
             if (!fs.existsSync(SESSIONS_DIR)) {
-              return JSON.stringify({                success: true,
+              return JSON.stringify({ success: true, 
                 sessions: [],
                 count: 0,
-                message: "Sessions directory not found"});
+                message: "Sessions directory not found"
+               });
             }
 
             const files = fs.readdirSync(SESSIONS_DIR)
@@ -742,23 +772,27 @@ ${content}
             const sessions = files.map(file => {
               const filePath = path.join(SESSIONS_DIR, file);
               const stats = fs.statSync(filePath);
-              return JSON.stringify({                name: file,
+              return {
+                name: file,
                 size: stats.size,
                 modified: stats.mtime,
-                path: filePath});
+                path: filePath
+              };
             });
 
-            return JSON.stringify({              success: true,
+            return JSON.stringify({ success: true, 
               sessions,
-              count: sessions.length});
+              count: sessions.length
+             });
           } catch (e) {
-            return JSON.stringify({              success: false,
-              error: e.message});
+            return JSON.stringify({ success: false, 
+              error: e.message
+             });
           }
         }
       })
     }
-  });
+  };
 };
 
 /**
