@@ -318,12 +318,39 @@ export class IndexManager {
    */
   async rebuildIndex(force = false) {
     const config = this.getConfig();
-    
+
     try {
       const vectorStore = getVectorStore();
-      
-      if (!vectorStore.initialized) {
-        await vectorStore.initialize({ model: config.embedding?.model });
+
+      // Check if we need to initialize or if model is not available
+      if (!vectorStore.initialized || !vectorStore.extractor) {
+        const initResult = await vectorStore.initialize({ model: config.embedding?.model });
+        if (!initResult.success || !vectorStore.extractor) {
+          // Model failed to load - still mark files as indexed in hash cache
+          // so we don't keep retrying, but return with fallback info
+          const files = force ? this.getMemoryFiles() : this.getChangedFiles();
+
+          if (files.length === 0) {
+            return { success: true, indexedFiles: 0, totalChunks: 0, message: 'No changes detected' };
+          }
+
+          // Update hashes to prevent repeated attempts
+          for (const file of files) {
+            const hash = this.calculateFileHash(file.path);
+            if (hash) {
+              this.hashCache.set(file.name, hash);
+            }
+          }
+          this.saveHashCache();
+
+          return {
+            success: true,
+            indexedFiles: files.length,
+            totalChunks: 0,
+            files: files.map(f => f.name),
+            warning: `Vector indexing skipped: ${initResult.error || 'Model not available'}. Keyword search will still work.`
+          };
+        }
       }
       
       // Clear existing index if forced

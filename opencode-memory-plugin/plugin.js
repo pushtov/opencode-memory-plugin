@@ -315,14 +315,14 @@ ${content}
               
               if (!initResult.success) {
                 // Fall back to keyword search
-                return {
+                return JSON.stringify({
                   success: true,
                   query,
                   mode: 'keyword',
                   matches: await fallbackKeywordSearch(query, limit),
                   count: (await fallbackKeywordSearch(query, limit)).length,
                   note: `Vector search unavailable: ${initResult.error}. Using keyword search instead.`
-                };
+                });
               }
             }
 
@@ -343,7 +343,7 @@ ${content}
               });
             }
 
-            return {
+            return JSON.stringify({
               success: true,
               query,
               mode: searchMode,
@@ -357,17 +357,17 @@ ${content}
               count: results.length,
               model: vectorStore.modelName,
               indexed: vectorStore.getIndexedCount()
-            };
+            });
           } catch (e) {
             // Fall back to keyword search on error
-            return {
+            return JSON.stringify({
               success: true,
               query,
               mode: 'keyword',
               matches: await fallbackKeywordSearch(query, 10),
               count: (await fallbackKeywordSearch(query, 10)).length,
               note: `Vector search failed: ${e.message}. Using keyword search.`
-            };
+            });
           }
         }
       }),
@@ -485,25 +485,42 @@ ${content}
             const config = getConfig();
 
             if (!config) {
-              return JSON.stringify({ success: false, 
+              return JSON.stringify({ success: false,
                 error: "Memory configuration not found. Please run the initialization script."
                });
             }
 
             // Get vector store instance
             const vectorStore = getVectorStore();
-            
+
             // Initialize
-            const initResult = await vectorStore.initialize({ 
-              model: config.embedding?.model 
+            const initResult = await vectorStore.initialize({
+              model: config.embedding?.model
             });
-            
+
+            // Get all memory files
+            const files = getMemoryFiles();
+
+            if (files.length === 0) {
+              return JSON.stringify({ success: true,
+                message: "No memory files found to index",
+                indexedFiles: 0,
+                totalChunks: 0
+               });
+            }
+
+            // If model failed to load, return success with warning (keyword search still works)
             if (!initResult.success) {
-              return {
-                success: false,
-                error: `Failed to initialize vector store: ${initResult.error}`,
-                fallback: initResult.fallback
-              };
+              return JSON.stringify({
+                success: true,
+                message: "Index created with keyword search only (vector search unavailable)",
+                warning: `Vector indexing skipped: ${initResult.error}`,
+                model: initResult.model || config.embedding?.model || 'Xenova/all-MiniLM-L6-v2',
+                dimensions: initResult.dimensions || 384,
+                indexedFiles: files.length,
+                totalChunks: 0,
+                fallback: true
+              });
             }
 
             // Clear existing index if force rebuild
@@ -511,21 +528,10 @@ ${content}
               vectorStore.clearIndex();
             }
 
-            // Get all memory files
-            const files = getMemoryFiles();
-            
-            if (files.length === 0) {
-              return JSON.stringify({ success: true, 
-                message: "No memory files found to index",
-                indexedFiles: 0,
-                totalChunks: 0
-               });
-            }
-
             // Index each file
             const results = [];
             let totalChunks = 0;
-            
+
             for (const file of files) {
               try {
                 const content = fs.readFileSync(file.path, 'utf-8');
@@ -544,7 +550,7 @@ ${content}
             // Get final status
             const status = vectorStore.getStatus();
 
-            return JSON.stringify({ success: true, 
+            return JSON.stringify({ success: true,
               message: "Index rebuild completed",
               force,
               model: status.model,
@@ -555,7 +561,7 @@ ${content}
               lastIndexed: status.lastIndexed
              });
           } catch (e) {
-            return JSON.stringify({ success: false, 
+            return JSON.stringify({ success: false,
               error: e.message
              });
           }
@@ -603,7 +609,7 @@ ${content}
               // Vector store not initialized
             }
 
-            return {
+            return JSON.stringify({
               success: true,
               config: {
                 version: config.version,
@@ -622,7 +628,7 @@ ${content}
                 lastIndexed: vectorStatus.lastIndexed || null,
                 dbPath: vectorStatus.dbPath || null
               }
-            };
+            });
           } catch (e) {
             return JSON.stringify({ success: false, 
               error: e.message
@@ -642,12 +648,12 @@ ${content}
             const { force } = args;
             const indexManager = getIndexManager();
             const result = await indexManager.rebuildIndex(force);
-            return {
+            return JSON.stringify({
               success: result.success,
               ...result
-            };
+            });
           } catch (e) {
-            return JSON.stringify({ success: false, 
+            return JSON.stringify({ success: false,
               error: e.message
              });
           }
@@ -694,7 +700,7 @@ ${content}
         },
         async execute(args, context) {
           try {
-            const { title, content, tags } = args;
+            const { title, content, tags = [] } = args;
             const timestamp = new Date().toISOString();
             const date = timestamp.split('T')[0];
             const time = timestamp.split('T')[1].split('.')[0].replace(/:/g, '-');

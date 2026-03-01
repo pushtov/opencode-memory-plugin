@@ -345,6 +345,7 @@ function install() {
   log('Step 1/5: Creating memory directory structure...', 'yellow');
   ensureDir(MEMORY_DIR);
   ensureDir(DAILY_DIR);
+  ensureDir(path.join(MEMORY_DIR, 'sessions'));
   ensureDir(path.join(MEMORY_DIR, 'archive', 'weekly'));
   ensureDir(path.join(MEMORY_DIR, 'archive', 'monthly'));
   log('  ✓ Directory structure created', 'green');

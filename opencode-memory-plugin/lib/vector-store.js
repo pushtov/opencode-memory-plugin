@@ -63,7 +63,7 @@ export class VectorStore {
    */
   async initialize(options = {}) {
     const config = this.getConfig();
-    
+
     if (!config.embedding?.enabled) {
       return {
         success: false,
@@ -79,12 +79,25 @@ export class VectorStore {
     try {
       // Initialize database
       await this.initDatabase();
-      
+
       // Load embedding model
       await this.loadModel(options.forceReload);
-      
+
+      // Check if model loaded successfully
+      if (!this.extractor) {
+        // Model failed to load - but database is ready for keyword search
+        this.initialized = true;
+        return {
+          success: false,
+          error: 'Failed to load embedding model',
+          fallback: true,
+          model: this.modelName,
+          dimensions: this.dimensions
+        };
+      }
+
       this.initialized = true;
-      
+
       return {
         success: true,
         model: this.modelName,
