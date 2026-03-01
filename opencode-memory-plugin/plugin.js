@@ -116,7 +116,7 @@ function generateSlug(content) {
  */
 export const MemoryPlugin = async (ctx) => {
   return {
-    tools: {
+    tool: {
       memory_write: tool({
         description: "Write an entry to long-term memory. Use this to save important information that should persist across sessions.",
         args: {
