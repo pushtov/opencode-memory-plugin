@@ -124,7 +124,7 @@ export const MemoryPlugin = async (ctx) => {
           type: tool.schema.string().optional().default("general").describe("The type of entry (e.g., 'preference', 'decision', 'note', 'general')"),
           tags: tool.schema.array(tool.schema.string()).optional().default([]).describe("Tags for categorizing the entry")
         },
-        async execute(args) {
+        async execute(args, context) {
           try {
             const { content, type, tags } = args;
             const timestamp = new Date().toISOString();
@@ -179,7 +179,7 @@ ${content}
         args: {
           file: tool.schema.string().optional().default("MEMORY.md").describe("The memory file to read (e.g., 'MEMORY.md', 'SOUL.md', 'AGENTS.md')")
         },
-        async execute(args) {
+        async execute(args, context) {
           try {
             const file = args.file || 'MEMORY.md';
             
@@ -223,7 +223,7 @@ ${content}
           query: tool.schema.string().describe("The search query to look for in memory"),
           file: tool.schema.string().optional().default("MEMORY.md").describe("The memory file to search (default: MEMORY.md)")
         },
-        async execute(args) {
+        async execute(args, context) {
           try {
             const query = args.query;
             const file = args.file || 'MEMORY.md';
@@ -281,7 +281,7 @@ ${content}
           limit: tool.schema.number().optional().default(10).describe("Maximum number of results to return"),
           threshold: tool.schema.number().optional().default(0.3).describe("Minimum similarity score (0-1)")
         },
-        async execute(args) {
+        async execute(args, context) {
           const { query, mode, limit, threshold } = args;
           
           // Input validation
@@ -385,7 +385,7 @@ ${content}
         args: {
           days: tool.schema.number().optional().default(7).describe("Number of days to look back (default: 7)")
         },
-        async execute(args) {
+        async execute(args, context) {
           try {
             const { days } = args;
 
@@ -431,7 +431,7 @@ ${content}
       init_daily: tool({
         description: "Initialize today's daily log file if it doesn't exist.",
         args: {},
-        async execute(args) {
+        async execute(args, context) {
           try {
             const today = new Date().toISOString().split('T')[0];
             const dailyFile = path.join(DAILY_DIR, `${today}.md`);
@@ -493,7 +493,7 @@ ${content}
         args: {
           force: tool.schema.boolean().optional().default(false).describe("Force rebuild even if index exists")
         },
-        async execute(args) {
+        async execute(args, context) {
           try {
             const { force } = args;
             const config = getConfig();
@@ -583,7 +583,7 @@ ${content}
       index_status: tool({
         description: "Check the status of the vector search index and memory configuration.",
         args: {},
-        async execute(args) {
+        async execute(args, context) {
           try {
             const config = getConfig();
 
@@ -657,7 +657,7 @@ ${content}
         args: {
           force: tool.schema.boolean().optional().default(false).describe("Force rebuild of all files, not just changed ones")
         },
-        async execute(args) {
+        async execute(args, context) {
           try {
             const { force } = args;
             const indexManager = getIndexManager();
@@ -682,7 +682,7 @@ ${content}
           debounceDelay: tool.schema.number().optional().describe("Delay in milliseconds before processing queued updates (default: 1000)"),
           batchSize: tool.schema.number().optional().describe("Number of files to process in each batch (default: 10)")
         },
-        async execute(args) {
+        async execute(args, context) {
           try {
             // Input validation
             if (args.debounceDelay !== undefined && args.debounceDelay < 0) {
@@ -715,7 +715,7 @@ ${content}
           content: tool.schema.string().describe("The session content to save"),
           tags: tool.schema.array(tool.schema.string()).optional().default([]).describe("Tags for categorizing the session")
         },
-        async execute(args) {
+        async execute(args, context) {
           try {
             const { title, content, tags } = args;
             const timestamp = new Date().toISOString();
@@ -776,7 +776,7 @@ ${content}
         args: {
           limit: tool.schema.number().optional().default(20).describe("Maximum number of sessions to list")
         },
-        async execute(args) {
+        async execute(args, context) {
           try {
             const { limit } = args;
 
