@@ -205,6 +205,16 @@ function updateOpenCodeConfig() {
     log('  ⚠ Existing config is invalid, creating new one', 'yellow');
   }
 
+  // Add plugin to the plugin array
+  if (!config.plugin) {
+    config.plugin = [];
+  }
+  
+  if (!config.plugin.includes('@csuwl/opencode-memory-plugin')) {
+    config.plugin.push('@csuwl/opencode-memory-plugin');
+    log('  ✓ Added @csuwl/opencode-memory-plugin to plugins', 'green');
+  }
+
   // Add instructions if not present
   if (!config.instructions) {
     config.instructions = [
