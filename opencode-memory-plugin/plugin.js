@@ -4,6 +4,7 @@ import path from 'path';
 import { getVectorStore } from './lib/vector-store.js';
 import { BM25Index, createBM25Index } from './lib/bm25.js';
 import { getIndexManager } from './lib/index-manager.js';
+import { syncSessions, getSyncStatus, configureSync, autoSyncIfNeeded } from './lib/session-sync.js';
 
 const HOME = process.env.HOME || process.env.USERPROFILE;
 const MEMORY_DIR = path.join(HOME, '.opencode', 'memory');
@@ -786,14 +787,61 @@ ${content}
               };
             });
 
-            return JSON.stringify({ success: true, 
+            return JSON.stringify({ success: true,
               sessions,
               count: sessions.length
              });
           } catch (e) {
-            return JSON.stringify({ success: false, 
+            return JSON.stringify({ success: false,
               error: e.message
              });
+          }
+        }
+      }),
+
+      sync_sessions: tool({
+        description: "Sync OpenCode conversation sessions to memory index. This allows searching through past conversations. Run this periodically to index new sessions.",
+        args: {
+          force: tool.schema.boolean().optional().default(false).describe("Force re-sync all sessions (default: only sync new/updated sessions)"),
+          limit: tool.schema.number().optional().default(100).describe("Maximum number of sessions to sync (default: 100)")
+        },
+        async execute(args, context) {
+          try {
+            const { force, limit } = args;
+            const result = await syncSessions({ force, limit });
+            return JSON.stringify(result);
+          } catch (e) {
+            return JSON.stringify({ success: false, error: e.message });
+          }
+        }
+      }),
+
+      sync_status: tool({
+        description: "Check the status of OpenCode session synchronization.",
+        args: {},
+        async execute(args, context) {
+          try {
+            const status = getSyncStatus();
+            return JSON.stringify({ success: true, ...status });
+          } catch (e) {
+            return JSON.stringify({ success: false, error: e.message });
+          }
+        }
+      }),
+
+      configure_sync: tool({
+        description: "Configure automatic session synchronization settings.",
+        args: {
+          autoSync: tool.schema.boolean().optional().describe("Enable/disable automatic session syncing (default: true)"),
+          syncInterval: tool.schema.number().optional().describe("Sync interval in milliseconds (default: 3600000 = 1 hour)"),
+          lastSyncOnly: tool.schema.boolean().optional().describe("Only sync the most recent session (default: false)")
+        },
+        async execute(args, context) {
+          try {
+            const result = configureSync(args);
+            return JSON.stringify(result);
+          } catch (e) {
+            return JSON.stringify({ success: false, error: e.message });
           }
         }
       })
