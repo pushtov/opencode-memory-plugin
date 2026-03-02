@@ -126,15 +126,15 @@ export const MemoryPlugin = async (ctx) => {
         },
         async execute(args, context) {
           try {
-            const { content, type, tags } = args;
+            const { content, type, tags = [] } = args;
             const timestamp = new Date().toISOString();
 
             const entry = `
-## ${type.charAt(0).toUpperCase() + type.slice(1)} Entry
+## ${(type || 'general').charAt(0).toUpperCase() + (type || 'general').slice(1)} Entry
 
 **Date**: ${timestamp}
-**Type**: ${type}
-**Tags**: ${tags.join(', ') || 'none'}
+**Type**: ${type || 'general'}
+**Tags**: ${tags.length > 0 ? tags.join(', ') : 'none'}
 
 ${content}
 
@@ -719,7 +719,7 @@ ${content}
             const sessionContent = `# Session: ${sessionTitle}
 
 **Date**: ${timestamp}
-**Tags**: ${tags.join(', ') || 'none'}
+**Tags**: ${tags.length > 0 ? tags.join(', ') : 'none'}
 
 ## Summary
 
