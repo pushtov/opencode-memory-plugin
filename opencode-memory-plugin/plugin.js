@@ -116,6 +116,9 @@ function generateSlug(content) {
  * Provides persistent memory functionality for OpenCode
  */
 export const MemoryPlugin = async (ctx) => {
+  // Auto-sync sessions on plugin load (runs in background)
+  autoSyncIfNeeded().catch(() => {});
+
   return {
     tool: {
       memory_write: tool({

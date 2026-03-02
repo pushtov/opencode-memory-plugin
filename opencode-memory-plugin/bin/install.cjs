@@ -159,6 +159,12 @@ function createMemoryConfig() {
       chunkOverlap: 80,
       autoRebuild: true
     },
+    // Session sync configuration (auto-sync OpenCode conversations)
+    sessionSync: {
+      autoSync: true,
+      syncInterval: 3600000,
+      lastSyncOnly: false
+    },
     // Legacy v1.0 fields (for backward compatibility)
     auto_save: true,
     consolidation: {
