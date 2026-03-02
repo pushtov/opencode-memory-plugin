@@ -288,6 +288,11 @@ export class VectorStore {
       await this.initialize();
     }
 
+    // Check if database is available
+    if (!this.db) {
+      return { indexed: 0, source: sourceFile, error: 'Database not initialized' };
+    }
+
     const { chunkSize = 400, overlap = 80, clearExisting = false } = options;
 
     // Clear existing entries for this file
@@ -297,13 +302,18 @@ export class VectorStore {
 
     // Split into chunks
     const chunks = this.chunkText(content, chunkSize, overlap);
-    
+
     if (chunks.length === 0) {
       return { indexed: 0, source: sourceFile };
     }
 
     // Generate embeddings for all chunks
     const embeddings = await this.generateEmbeddings(chunks.map(c => c.content));
+
+    // Check again after async operation
+    if (!this.db) {
+      return { indexed: 0, source: sourceFile, error: 'Database not initialized' };
+    }
 
     // Prepare statements
     const insertVec = this.db.prepare(`
@@ -350,6 +360,8 @@ export class VectorStore {
    * Clear index for a specific file
    */
   clearFileIndex(sourceFile) {
+    if (!this.db) return;
+
     // Get document IDs to delete from vector table
     const docs = this.db.prepare(`
       SELECT id FROM documents WHERE source_file = ?
@@ -373,6 +385,7 @@ export class VectorStore {
    * Clear entire index
    */
   clearIndex() {
+    if (!this.db) return;
     this.db.exec(`
       DELETE FROM documents;
       DELETE FROM vec_embeddings;
@@ -384,8 +397,9 @@ export class VectorStore {
    * Update metadata
    */
   updateMetadata() {
+    if (!this.db) return;
     const count = this.getIndexedCount();
-    
+
     this.db.prepare(`
       INSERT OR REPLACE INTO index_metadata (id, model_name, dimensions, total_chunks, last_indexed)
       VALUES (1, ?, ?, ?, datetime('now'))
@@ -396,6 +410,7 @@ export class VectorStore {
    * Get count of indexed documents
    */
   getIndexedCount() {
+    if (!this.db) return 0;
     const result = this.db.prepare('SELECT COUNT(*) as count FROM documents').get();
     return result?.count || 0;
   }
@@ -448,6 +463,7 @@ export class VectorStore {
     sql += ` ORDER BY v.distance ASC LIMIT ?`;
     params.push(limit);
 
+    if (!this.db) return [];
     const results = this.db.prepare(sql).all(...params);
 
     // Calculate similarity score (1 - distance for cosine)
@@ -543,6 +559,7 @@ export class VectorStore {
       params.push(sourceFile);
     }
 
+    if (!this.db) return [];
     const docs = this.db.prepare(sql).all(...params);
     
     if (docs.length === 0) {
@@ -581,10 +598,12 @@ export class VectorStore {
    */
   getStatus() {
     const count = this.getIndexedCount();
-    
+
     let metadata = null;
     try {
-      metadata = this.db.prepare('SELECT * FROM index_metadata WHERE id = 1').get();
+      if (this.db) {
+        metadata = this.db.prepare('SELECT * FROM index_metadata WHERE id = 1').get();
+      }
     } catch (e) {
       // Metadata doesn't exist yet
     }
